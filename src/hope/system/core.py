@@ -84,6 +84,7 @@ class HopeSystem:
     agent_executor: Optional[AgentExecutor] = None
     speech_backend: Optional[SpeechBackend] = None
     skill_manager: Optional[SkillManager] = None
+    skill_watcher: Optional[Any] = None
     _learning_orchestrator: Optional[LearningOrchestrator] = None
     _mcp_clients: List[MCPClient] = field(default_factory=list)
 

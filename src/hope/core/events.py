@@ -55,6 +55,7 @@ class EventType(str, Enum):
     WORKFLOW_END = "workflow_end"
     SKILL_EXECUTE_START = "skill_execute_start"
     SKILL_EXECUTE_END = "skill_execute_end"
+    SKILLS_UPDATED = "skills_updated"
     SESSION_START = "session_start"
     SESSION_END = "session_end"
     # Phase 16 — A2A Protocol
@@ -88,6 +89,12 @@ class EventType(str, Enum):
     SCREEN_FRAME = "screen_frame"
     # Always-on speech-to-text — emitted for each finalized transcript chunk
     SPEECH_TRANSCRIPT = "speech_transcript"
+    # Tmux specialist orchestrator — spawn/kill/route lifecycle for Hope's
+    # ephemeral Claude Code panes (see ``hope.agents.tmux_orchestrator``).
+    PANE_SPAWNED = "pane_spawned"
+    PANE_KILLED = "pane_killed"
+    PANE_MESSAGE = "pane_message"
+    SPECIALIST_AT_CAPACITY = "specialist_at_capacity"
 
 
 @dataclass(slots=True)

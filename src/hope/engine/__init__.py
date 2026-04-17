@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib
 
 # Import engine modules to trigger @EngineRegistry.register() decorators
+import hope.engine.claude_code_tmux  # noqa: F401
 import hope.engine.ollama  # noqa: F401
 import hope.engine.openai_compat_engines  # noqa: F401
 from hope.engine._base import (

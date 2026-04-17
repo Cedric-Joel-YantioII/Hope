@@ -551,7 +551,12 @@ class DenseMemory(MemoryBackend):
 
     backend_id = "dense"
 
-    def __init__(self, embedder: Optional[Embedder] = None) -> None:
+    def __init__(
+        self,
+        embedder: Optional[Embedder] = None,
+        *,
+        embed_mode: str = "sync",
+    ) -> None:
         self._embedder: Optional[Embedder] = embedder
         # Shape (n_docs, dim), L2-normalized row-wise. None until first store.
         self._matrix = None
@@ -561,7 +566,14 @@ class DenseMemory(MemoryBackend):
         self._doc_ids: List[str] = []
         # id -> index; lets us delete in O(1) for lookups
         self._id_to_index: Dict[str, int] = {}
+        # Rows where the async worker still owes us a real vector.
+        self._placeholder_ids: set = set()
         self._lock = threading.Lock()
+        if embed_mode not in ("sync", "async"):
+            raise ValueError(
+                f"embed_mode must be 'sync' or 'async', got {embed_mode!r}",
+            )
+        self._embed_mode = embed_mode
 
     # -- embedder lifecycle ------------------------------------------------
 
@@ -604,8 +616,17 @@ class DenseMemory(MemoryBackend):
         assert len(sources) == len(contents) and len(metadatas) == len(contents)
 
         emb = self._get_embedder()
-        vectors = emb.embed(contents)  # already normalized
         new_ids = [uuid.uuid4().hex for _ in contents]
+
+        if self._embed_mode == "async":
+            # Insert placeholder zero vectors so index shape stays intact;
+            # the worker patches them in via update_vector().
+            dim = emb.dim()
+            vectors = np.zeros((len(contents), dim), dtype=np.float32)
+            placeholder = True
+        else:
+            vectors = emb.embed(contents)  # already normalized
+            placeholder = False
 
         with self._lock:
             if self._matrix is None:
@@ -620,7 +641,47 @@ class DenseMemory(MemoryBackend):
                 self._metadatas.append(dict(m))
                 self._doc_ids.append(doc_id)
                 self._id_to_index[doc_id] = len(self._contents) - 1
+                if placeholder:
+                    self._placeholder_ids.add(doc_id)
+
+        if self._embed_mode == "async":
+            # Import lazily to avoid a hard dep cycle when async is unused.
+            from hope.tools.storage.async_embedder import get_async_embedder
+
+            aq = get_async_embedder(emb)
+            for c, doc_id in zip(contents, new_ids):
+                aq.enqueue(doc_id, c, self.update_vector)
         return new_ids
+
+    # -- async embedder callback ------------------------------------------
+
+    def update_vector(self, doc_id: str, vector: Any) -> None:
+        """Replace the stored vector for *doc_id* in place.
+
+        Called by :class:`AsyncEmbedderQueue` once the real embedding is
+        ready.  No-op if the doc was deleted before the worker got to it.
+        """
+        import numpy as np
+
+        with self._lock:
+            idx = self._id_to_index.get(doc_id)
+            if idx is None or self._matrix is None:
+                return
+            self._matrix[idx] = np.asarray(vector, dtype=np.float32)
+            self._placeholder_ids.discard(doc_id)
+
+    def placeholder_ids(self) -> List[str]:
+        """Return the doc ids still awaiting a real embedding."""
+        with self._lock:
+            return list(self._placeholder_ids)
+
+    def contents_for(self, doc_id: str) -> Optional[str]:
+        """Return the stored content for *doc_id*, if any."""
+        with self._lock:
+            idx = self._id_to_index.get(doc_id)
+            if idx is None:
+                return None
+            return self._contents[idx]
 
     def retrieve(
         self,
@@ -694,6 +755,7 @@ class DenseMemory(MemoryBackend):
             self._sources.pop(idx)
             self._metadatas.pop(idx)
             self._doc_ids.pop(idx)
+            self._placeholder_ids.discard(doc_id)
             # Rebuild id -> index for entries after the removed one
             for did, i in list(self._id_to_index.items()):
                 if i > idx:
@@ -709,6 +771,7 @@ class DenseMemory(MemoryBackend):
             self._metadatas.clear()
             self._doc_ids.clear()
             self._id_to_index.clear()
+            self._placeholder_ids.clear()
 
     def count(self) -> int:
         """Number of stored documents."""

@@ -394,6 +394,21 @@ class LemonadeEngineConfig:
     host: str = "http://localhost:8000"
 
 
+@dataclass(slots=True)
+class ClaudeCodeTmuxEngineConfig:
+    """Per-engine config for the Claude Code tmux-pane backend.
+
+    Assumes an external orchestrator has already spawned a tmux pane running
+    ``claude --dangerously-skip-permissions`` inside the Hope project dir and
+    wired the pane's stdout to ``fifo_path`` via ``pipe-pane``/``tee``.
+    """
+
+    pane_target: str = "hope:0.0"
+    fifo_path: str = "~/.hope/panes/hope-main.fifo"
+    request_timeout_sec: float = 120.0
+    sentinel_prefix: str = "---HOPE_PANE"
+
+
 @dataclass
 class EngineConfig:
     """Inference engine settings with nested per-engine configs."""
@@ -411,6 +426,9 @@ class EngineConfig:
     apple_fm: AppleFmEngineConfig = field(default_factory=AppleFmEngineConfig)
     gemma_cpp: GemmaCppEngineConfig = field(default_factory=GemmaCppEngineConfig)
     lemonade: LemonadeEngineConfig = field(default_factory=LemonadeEngineConfig)
+    claude_code_tmux: ClaudeCodeTmuxEngineConfig = field(
+        default_factory=ClaudeCodeTmuxEngineConfig,
+    )
 
     # Backward-compat properties for old flat attribute names
     @property
@@ -1277,6 +1295,25 @@ class AgentManagerConfig:
 
 
 @dataclass(slots=True)
+class OrchestratorConfig:
+    """Tmux + Claude Code specialist orchestrator settings.
+
+    Governs how Hope spawns and manages ephemeral specialist panes. Soft
+    ``max_concurrent_specialists`` caps keep RAM pressure predictable on
+    Apple Silicon M2 / 8 GB boxes — when at capacity the orchestrator
+    queues further spawn requests and emits ``SPECIALIST_AT_CAPACITY``
+    so the hope-main pane can decide to wait or kill an idle specialist.
+    """
+
+    max_concurrent_specialists: int = 4
+    tmux_session_name: str = "hope"
+    bus_socket_path: str = "~/.hope/panes/bus.sock"
+    panes_dir: str = "~/.hope/panes/"
+    roles_dir: str = "src/hope/skills/roles/"
+    hope_main_system_prompt_path: Optional[str] = None
+
+
+@dataclass(slots=True)
 class MemoryFilesConfig:
     """Persistent memory-file paths and nudge settings."""
 
@@ -1330,6 +1367,12 @@ class SkillsConfig:
     index_dir: str = "~/.hope/skill-index/"
     max_depth: int = 5
     sandbox_dangerous: bool = True
+    # Re-discover skills automatically when files change under the
+    # watched skill directories (``~/.hope/skills/``, ``./skills/``,
+    # ``~/.claude/skills/``, ``./.claude/skills/``).  Enabled by default
+    # so skills written by Claude Code at runtime become invocable
+    # immediately without a restart.  Requires the ``skills`` extra.
+    watch: bool = True
     sources: List[SkillSourceConfig] = field(default_factory=list)
 
 
@@ -1401,6 +1444,7 @@ class HopeConfig:
     vision: VisionConfig = field(default_factory=VisionConfig)
     optimize: OptimizeConfig = field(default_factory=OptimizeConfig)
     agent_manager: AgentManagerConfig = field(default_factory=AgentManagerConfig)
+    orchestrator: OrchestratorConfig = field(default_factory=OrchestratorConfig)
     memory_files: MemoryFilesConfig = field(default_factory=MemoryFilesConfig)
     system_prompt: SystemPromptConfig = field(default_factory=SystemPromptConfig)
     compression: CompressionConfig = field(default_factory=CompressionConfig)
@@ -1616,6 +1660,7 @@ def load_config(path: Optional[Path] = None) -> HopeConfig:
             "vision",
             "optimize",
             "agent_manager",
+            "orchestrator",
             "digest",
         )
         for section_name in top_sections:
@@ -1910,6 +1955,7 @@ __all__ = [
     "BrowserConfig",
     "CapabilitiesConfig",
     "ChannelConfig",
+    "ClaudeCodeTmuxEngineConfig",
     "DEFAULT_CONFIG_DIR",
     "DEFAULT_CONFIG_PATH",
     "DiscordChannelConfig",
@@ -1934,6 +1980,7 @@ __all__ = [
     "MetricsConfig",
     "OllamaEngineConfig",
     "OptimizeConfig",
+    "OrchestratorConfig",
     "RoutingLearningConfig",
     "SGLangEngineConfig",
     "SandboxConfig",

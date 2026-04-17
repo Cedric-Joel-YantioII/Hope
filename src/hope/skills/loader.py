@@ -143,6 +143,38 @@ def load_skill(
     return manifest
 
 
+def _adapt_claude_code_frontmatter(frontmatter: dict) -> None:
+    """Normalize Claude Code SKILL.md frontmatter into Hope's schema.
+
+    Claude Code writes skills with ``allowed-tools`` (a YAML key using a
+    hyphen) but Hope's parser intentionally does not map this onto any
+    canonical field.  To keep the parser data-driven, we translate the
+    field here before the manifest is built.
+
+    Mutates *frontmatter* in place.  Safe to call on any frontmatter dict —
+    if ``allowed-tools`` is absent the function is a no-op.
+    """
+    raw = frontmatter.get("allowed-tools")
+    if raw is None:
+        return
+    if isinstance(raw, list):
+        tools = [str(t).strip() for t in raw if str(t).strip()]
+    elif isinstance(raw, str):
+        # Accept either space- or comma-delimited strings.
+        cleaned = raw.replace(",", " ")
+        tools = [tok for tok in cleaned.split() if tok]
+    else:
+        tools = []
+    if not tools:
+        return
+    # Merge (preserve any existing required_capabilities, dedupe).
+    existing = list(frontmatter.get("required_capabilities") or [])
+    for t in tools:
+        if t not in existing:
+            existing.append(t)
+    frontmatter["required_capabilities"] = existing
+
+
 def load_skill_markdown(path: str | Path) -> SkillManifest:
     """Load a skill manifest from a SKILL.md file via SkillParser.
 
@@ -179,6 +211,13 @@ def load_skill_markdown(path: str | Path) -> SkillManifest:
         frontmatter["name"] = path.stem
     if "description" not in frontmatter:
         frontmatter["description"] = frontmatter.get("name", path.stem)
+
+    # Claude Code compatibility: map ``allowed-tools`` (YAML frontmatter key)
+    # onto ``required_capabilities`` so downstream capability checks can see
+    # the tools a skill needs.  Accepts either a list (``["Bash", "Read"]``)
+    # or a space/comma-delimited string (``"Bash Read"``).  The original
+    # ``allowed-tools`` key is left intact so other consumers still see it.
+    _adapt_claude_code_frontmatter(frontmatter)
 
     parser = SkillParser()
     try:

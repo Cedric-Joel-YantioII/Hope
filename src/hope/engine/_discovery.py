@@ -27,6 +27,7 @@ _HOST_MAP: Dict[str, str | None] = {
     "cloud": None,
     "litellm": None,
     "gemma_cpp": None,
+    "claude_code_tmux": None,
 }
 
 
@@ -42,6 +43,16 @@ def _make_engine(key: str, config: HopeConfig) -> InferenceEngine:
             tokenizer_path=cfg.tokenizer_path or None,
             model_type=cfg.model_type or None,
             num_threads=cfg.num_threads,
+        )
+
+    # claude_code_tmux: pass pane target / FIFO path / timeout
+    if key == "claude_code_tmux":
+        cfg = config.engine.claude_code_tmux
+        return cls(
+            pane_target=cfg.pane_target,
+            fifo_path=cfg.fifo_path,
+            request_timeout_sec=cfg.request_timeout_sec,
+            sentinel_prefix=cfg.sentinel_prefix,
         )
 
     host_attr = _HOST_MAP.get(key)

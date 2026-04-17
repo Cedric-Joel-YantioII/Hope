@@ -168,6 +168,7 @@ class SystemBuilder:
         tool_executor = ToolExecutor(tool_list, bus) if tool_list else None
 
         skill_manager = None
+        skill_watcher = None
         skill_few_shot_examples: List[str] = []
         if config.skills.enabled:
             try:
@@ -178,10 +179,20 @@ class SystemBuilder:
                 skill_manager = SkillManager(
                     bus, capability_policy=sec.capability_policy
                 )
-                skill_paths = [Path(config.skills.skills_dir).expanduser()]
+                # Default skill paths.  Workspace paths are prepended so
+                # local skills win first-seen precedence.  ``.claude/skills``
+                # (both project-root and user-level) is included so
+                # Claude-Code-authored skills are picked up automatically.
+                skill_paths: List[Path] = [
+                    Path(config.skills.skills_dir).expanduser(),
+                    Path("~/.claude/skills").expanduser(),
+                ]
                 workspace_skills = Path("./skills")
                 if workspace_skills.exists():
                     skill_paths.insert(0, workspace_skills)
+                workspace_claude_skills = Path("./.claude/skills")
+                if workspace_claude_skills.exists():
+                    skill_paths.insert(0, workspace_claude_skills)
                 skill_manager.discover(paths=skill_paths)
                 if tool_executor:
                     skill_manager.set_tool_executor(tool_executor)
@@ -192,6 +203,30 @@ class SystemBuilder:
                 if tool_list:
                     tool_executor = ToolExecutor(tool_list, bus)
                 skill_few_shot_examples = skill_manager.get_few_shot_examples()
+
+                # Watch for changes so new skills (including those written
+                # by Claude Code into .claude/skills/ at runtime) become
+                # invocable without a restart.
+                if getattr(config.skills, "watch", True):
+                    try:
+                        from hope.skills.watcher import SkillWatcher
+
+                        skill_watcher = SkillWatcher(
+                            skill_manager,
+                            skill_paths,
+                            tool_executor=tool_executor,
+                            bus=bus,
+                        )
+                        skill_watcher.start()
+                    except ImportError as exc:
+                        logger.info(
+                            "Skill watcher disabled (watchdog not installed): %s",
+                            exc,
+                        )
+                    except Exception as exc:
+                        logger.warning(
+                            "Failed to start skill watcher: %s", exc
+                        )
             except Exception as exc:
                 logger.warning("Failed to initialize skills: %s", exc)
 
@@ -294,6 +329,7 @@ class SystemBuilder:
             agent_executor=agent_executor,
             speech_backend=speech_backend,
             skill_manager=skill_manager,
+            skill_watcher=skill_watcher,
         )
         system._learning_orchestrator = learning_orchestrator
         system._skill_few_shot_examples = skill_few_shot_examples

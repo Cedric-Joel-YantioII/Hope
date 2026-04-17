@@ -872,6 +872,21 @@ BUILTIN_MODELS: List[ModelSpec] = [
         },
     ),
     # -----------------------------------------------------------------------
+    # Claude Code CLI (persistent tmux pane) — Hope's default "brain".
+    # Authenticated via the user's Claude Max plan through the CLI; no API
+    # key is needed here, hence requires_api_key=False.
+    # -----------------------------------------------------------------------
+    ModelSpec(
+        model_id="claude-code",
+        name="Claude Code (persistent tmux session)",
+        parameter_count_b=0.0,
+        context_length=200000,
+        supported_engines=("claude_code_tmux",),
+        provider="anthropic",
+        requires_api_key=False,
+        metadata={"runtime": "claude-code-cli", "stateful": True},
+    ),
+    # -----------------------------------------------------------------------
     # Cloud models — MiniMax
     # -----------------------------------------------------------------------
     ModelSpec(

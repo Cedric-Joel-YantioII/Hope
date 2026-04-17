@@ -46,6 +46,13 @@ dev = [
     "pre-commit>=3.0",
 ]
 inference-mlx = ["mlx-lm>=0.19; sys_platform == 'darwin'"]
+vision = [
+    # Apple Silicon only — Gemma 4 E4B multimodal via MLX
+    "mlx>=0.19; sys_platform == 'darwin' and platform_machine == 'arm64'",
+    "mlx-vlm>=0.1; sys_platform == 'darwin' and platform_machine == 'arm64'",
+    "pillow>=10",
+    "huggingface_hub>=0.24",
+]
 inference-vllm = ["vllm>=0.16.0"]
 inference-cloud = [
     "openai>=1.30",
@@ -63,6 +70,11 @@ tools-search = [
 memory-faiss = [
     "faiss-cpu>=1.7",
     "sentence-transformers>=2.2",
+    "numpy>=1.24",
+]
+memory = [
+    "sentence-transformers>=3.0",
+    "torch>=2.0",
     "numpy>=1.24",
 ]
 memory-colbert = [
@@ -117,8 +129,14 @@ security-signing = ["cryptography>=43"]
 sandbox-wasm = ["wasmtime>=25"]
 sandbox-docker = ["docker>=7.0"]
 dashboard = ["textual>=0.80"]
-speech = ["faster-whisper>=1.0"]
+speech = [
+    "faster-whisper>=1.0",
+    "silero-vad>=5.0",
+    "sounddevice>=0.4",
+    "numpy>=1.24",
+]
 speech-deepgram = ["deepgram-sdk>=3.0"]
+skills = ["watchdog>=4.0"]
 eval-wandb = ["wandb>=0.17"]
 eval-sheets = ["gspread>=6.0", "google-auth>=2.0"]
 docs = [
