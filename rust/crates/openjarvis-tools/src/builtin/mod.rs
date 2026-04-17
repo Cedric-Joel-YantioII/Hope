@@ -15,7 +15,7 @@ pub use shell::ShellExecTool;
 pub use think::ThinkTool;
 
 use crate::traits::BaseTool;
-use openjarvis_core::{ToolResult, ToolSpec};
+use hope_core::{ToolResult, ToolSpec};
 use serde_json::Value;
 
 pub enum BuiltinTool {
@@ -53,7 +53,7 @@ impl BaseTool for BuiltinTool {
     fn spec(&self) -> &ToolSpec {
         delegate_tool!(self, spec)
     }
-    fn execute(&self, params: &Value) -> Result<ToolResult, openjarvis_core::OpenJarvisError> {
+    fn execute(&self, params: &Value) -> Result<ToolResult, hope_core::HopeError> {
         delegate_tool!(self, execute, params)
     }
 }

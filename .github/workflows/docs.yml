@@ -6,13 +6,13 @@ on:
     paths:
       - "docs/**"
       - "mkdocs.yml"
-      - "src/openjarvis/**"
+      - "src/hope/**"
   pull_request:
     branches: [main]
     paths:
       - "docs/**"
       - "mkdocs.yml"
-      - "src/openjarvis/**"
+      - "src/hope/**"
   workflow_dispatch:
 
 permissions:

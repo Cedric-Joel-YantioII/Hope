@@ -8,7 +8,7 @@ from typing import Any, Dict, List
 
 import pytest
 
-from openjarvis.evals.core.agentic_runner import AgenticRunner, _extract_patch
+from hope.evals.core.agentic_runner import AgenticRunner, _extract_patch
 
 # ---------------------------------------------------------------------------
 # Mock objects

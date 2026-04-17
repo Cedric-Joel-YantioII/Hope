@@ -1,7 +1,7 @@
 //! Shell execution tool.
 
 use crate::traits::BaseTool;
-use openjarvis_core::{OpenJarvisError, ToolResult, ToolSpec};
+use hope_core::{HopeError, ToolResult, ToolSpec};
 use once_cell::sync::Lazy;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -36,7 +36,7 @@ impl BaseTool for ShellExecTool {
     fn spec(&self) -> &ToolSpec {
         &SPEC
     }
-    fn execute(&self, params: &Value) -> Result<ToolResult, OpenJarvisError> {
+    fn execute(&self, params: &Value) -> Result<ToolResult, HopeError> {
         let command = params["command"].as_str().unwrap_or("");
         let cwd = params["cwd"].as_str();
 

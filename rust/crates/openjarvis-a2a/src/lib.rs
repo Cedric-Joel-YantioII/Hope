@@ -1,4 +1,4 @@
-//! OpenJarvis A2A — Agent-to-Agent protocol types and in-memory task store.
+//! Hope A2A — Agent-to-Agent protocol types and in-memory task store.
 //!
 //! Implements the Google Agent-to-Agent JSON-RPC 2.0 protocol with typed
 //! request/response envelopes, task lifecycle management, and an in-memory

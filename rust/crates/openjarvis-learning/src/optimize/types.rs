@@ -1,6 +1,6 @@
 //! Core data types for the optimization framework.
 //!
-//! Rust translation of `src/openjarvis/learning/optimize/types.py`.
+//! Rust translation of `src/hope/learning/optimize/types.py`.
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

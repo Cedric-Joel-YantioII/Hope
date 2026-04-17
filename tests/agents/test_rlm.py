@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from openjarvis.agents._stubs import AgentContext
-from openjarvis.agents.rlm import RLMAgent
-from openjarvis.core.events import EventBus, EventType
-from openjarvis.core.registry import AgentRegistry
-from openjarvis.core.types import ToolResult
-from openjarvis.tools._stubs import BaseTool, ToolSpec
+from hope.agents._stubs import AgentContext
+from hope.agents.rlm import RLMAgent
+from hope.core.events import EventBus, EventType
+from hope.core.registry import AgentRegistry
+from hope.core.types import ToolResult
+from hope.tools._stubs import BaseTool, ToolSpec
 
 # ---------------------------------------------------------------------------
 # Helpers

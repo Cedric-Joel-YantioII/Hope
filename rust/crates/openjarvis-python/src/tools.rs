@@ -1,12 +1,12 @@
 //! PyO3 bindings for tool types.
 
-use openjarvis_tools::traits::BaseTool;
+use hope_tools::traits::BaseTool;
 use pyo3::prelude::*;
 use std::sync::Arc;
 
 #[pyclass(name = "ToolExecutor")]
 pub struct PyToolExecutor {
-    pub inner: Arc<openjarvis_tools::ToolExecutor>,
+    pub inner: Arc<hope_tools::ToolExecutor>,
 }
 
 #[pymethods]
@@ -14,7 +14,7 @@ impl PyToolExecutor {
     #[new]
     fn new() -> Self {
         Self {
-            inner: Arc::new(openjarvis_tools::ToolExecutor::new(None, None)),
+            inner: Arc::new(hope_tools::ToolExecutor::new(None, None)),
         }
     }
 
@@ -44,7 +44,7 @@ impl PyCalculatorTool {
     }
 
     fn execute(&self, expression: &str) -> PyResult<String> {
-        let tool = openjarvis_tools::builtin::calculator::CalculatorTool;
+        let tool = hope_tools::builtin::calculator::CalculatorTool;
         let params = serde_json::json!({"expression": expression});
         let result = tool
             .execute(&params)
@@ -64,7 +64,7 @@ impl PyThinkTool {
     }
 
     fn execute(&self, thought: &str) -> PyResult<String> {
-        let tool = openjarvis_tools::builtin::think::ThinkTool;
+        let tool = hope_tools::builtin::think::ThinkTool;
         let params = serde_json::json!({"thought": thought});
         let result = tool
             .execute(&params)
@@ -84,7 +84,7 @@ impl PyFileReadTool {
     }
 
     fn execute(&self, path: &str) -> PyResult<String> {
-        let tool = openjarvis_tools::builtin::file_tools::FileReadTool;
+        let tool = hope_tools::builtin::file_tools::FileReadTool;
         let params = serde_json::json!({"path": path});
         let result = tool
             .execute(&params)
@@ -104,7 +104,7 @@ impl PyFileWriteTool {
     }
 
     fn execute(&self, path: &str, content: &str) -> PyResult<String> {
-        let tool = openjarvis_tools::builtin::file_tools::FileWriteTool;
+        let tool = hope_tools::builtin::file_tools::FileWriteTool;
         let params = serde_json::json!({"path": path, "content": content});
         let result = tool
             .execute(&params)
@@ -125,7 +125,7 @@ impl PyShellExecTool {
 
     #[pyo3(signature = (command, cwd=None))]
     fn execute(&self, command: &str, cwd: Option<&str>) -> PyResult<String> {
-        let tool = openjarvis_tools::builtin::shell::ShellExecTool;
+        let tool = hope_tools::builtin::shell::ShellExecTool;
         let mut params = serde_json::json!({"command": command});
         if let Some(cwd) = cwd {
             params["cwd"] = serde_json::Value::String(cwd.to_string());
@@ -149,7 +149,7 @@ impl PyHttpRequestTool {
 
     #[pyo3(signature = (url, method="GET", body=None))]
     fn execute(&self, url: &str, method: &str, body: Option<&str>) -> PyResult<String> {
-        let tool = openjarvis_tools::builtin::http_tools::HttpRequestTool;
+        let tool = hope_tools::builtin::http_tools::HttpRequestTool;
         let mut params = serde_json::json!({"url": url, "method": method});
         if let Some(body) = body {
             params["body"] = serde_json::Value::String(body.to_string());
@@ -173,7 +173,7 @@ impl PyGitStatusTool {
 
     #[pyo3(signature = (cwd=None))]
     fn execute(&self, cwd: Option<&str>) -> PyResult<String> {
-        let tool = openjarvis_tools::builtin::git_tools::GitStatusTool;
+        let tool = hope_tools::builtin::git_tools::GitStatusTool;
         let mut params = serde_json::json!({});
         if let Some(cwd) = cwd {
             params["cwd"] = serde_json::Value::String(cwd.to_string());
@@ -197,7 +197,7 @@ impl PyGitDiffTool {
 
     #[pyo3(signature = (cwd=None))]
     fn execute(&self, cwd: Option<&str>) -> PyResult<String> {
-        let tool = openjarvis_tools::builtin::git_tools::GitDiffTool;
+        let tool = hope_tools::builtin::git_tools::GitDiffTool;
         let mut params = serde_json::json!({});
         if let Some(cwd) = cwd {
             params["cwd"] = serde_json::Value::String(cwd.to_string());
@@ -221,7 +221,7 @@ impl PyGitLogTool {
 
     #[pyo3(signature = (cwd=None, count=None))]
     fn execute(&self, cwd: Option<&str>, count: Option<u32>) -> PyResult<String> {
-        let tool = openjarvis_tools::builtin::git_tools::GitLogTool;
+        let tool = hope_tools::builtin::git_tools::GitLogTool;
         let mut params = serde_json::json!({});
         if let Some(cwd) = cwd {
             params["cwd"] = serde_json::Value::String(cwd.to_string());

@@ -1,4 +1,4 @@
-//! Optimization framework for OpenJarvis configuration tuning.
+//! Optimization framework for Hope configuration tuning.
 //!
 //! Provides LLM-guided search over the 5-primitive configuration space,
 //! with SQLite-backed trial persistence and Pareto frontier computation.

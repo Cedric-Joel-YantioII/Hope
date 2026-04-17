@@ -1,6 +1,6 @@
 //! Multi-objective reward function for orchestrator training.
 //!
-//! Ported from Python `openjarvis.learning.orchestrator.reward`.
+//! Ported from Python `hope.learning.orchestrator.reward`.
 
 use crate::orchestrator_types::Episode;
 use serde::{Deserialize, Serialize};

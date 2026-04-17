@@ -1,12 +1,12 @@
 [package]
-name = "openjarvis-tools"
+name = "hope-tools"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-openjarvis-core = { path = "../openjarvis-core" }
-openjarvis-engine = { path = "../openjarvis-engine" }
-openjarvis-security = { path = "../openjarvis-security" }
+hope-core = { path = "../hope-core" }
+hope-engine = { path = "../hope-engine" }
+hope-security = { path = "../hope-security" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }

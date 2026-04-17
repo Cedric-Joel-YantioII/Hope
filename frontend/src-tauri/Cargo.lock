@@ -2590,7 +2590,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "openjarvis-desktop"
+name = "hope-desktop"
 version = "0.1.0"
 dependencies = [
  "dispatch",

@@ -1,6 +1,6 @@
 //! LearningOrchestrator — coordinate the trace→learn→eval cycle.
 //!
-//! Ported from Python `openjarvis.learning.learning_orchestrator`.
+//! Ported from Python `hope.learning.learning_orchestrator`.
 //! Actual trace store access, file I/O, and LoRA training stay in Python;
 //! this module provides the cycle evaluation and acceptance logic.
 

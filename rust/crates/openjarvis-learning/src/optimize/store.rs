@@ -1,6 +1,6 @@
 //! SQLite-backed storage for optimization runs and trials.
 //!
-//! Rust translation of `src/openjarvis/learning/optimize/store.py`.
+//! Rust translation of `src/hope/learning/optimize/store.py`.
 
 use std::collections::HashMap;
 use std::path::Path;

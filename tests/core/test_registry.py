@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from openjarvis.core.registry import (
+from hope.core.registry import (
     EngineRegistry,
     ModelRegistry,
     RouterPolicyRegistry,

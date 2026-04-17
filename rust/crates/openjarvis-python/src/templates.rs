@@ -4,7 +4,7 @@ use pyo3::prelude::*;
 
 #[pyclass(name = "AgentTemplate")]
 pub struct PyAgentTemplate {
-    inner: openjarvis_templates::AgentTemplate,
+    inner: hope_templates::AgentTemplate,
 }
 
 #[pymethods]
@@ -51,7 +51,7 @@ impl PyAgentTemplate {
 
 #[pyfunction]
 pub fn load_template(toml_str: &str) -> PyResult<PyAgentTemplate> {
-    let tpl = openjarvis_templates::load_template(toml_str)
+    let tpl = hope_templates::load_template(toml_str)
         .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e))?;
     Ok(PyAgentTemplate { inner: tpl })
 }

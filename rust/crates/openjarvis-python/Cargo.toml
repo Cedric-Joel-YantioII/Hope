@@ -1,29 +1,29 @@
 [package]
-name = "openjarvis-python"
+name = "hope-python"
 version = "0.1.0"
 edition = "2021"
 
 [lib]
-name = "openjarvis_rust"
+name = "hope_rust"
 crate-type = ["cdylib"]
 
 [dependencies]
-openjarvis-core = { path = "../openjarvis-core" }
-openjarvis-engine = { path = "../openjarvis-engine" }
-openjarvis-security = { path = "../openjarvis-security" }
-openjarvis-tools = { path = "../openjarvis-tools" }
-openjarvis-agents = { path = "../openjarvis-agents" }
-openjarvis-traces = { path = "../openjarvis-traces" }
-openjarvis-telemetry = { path = "../openjarvis-telemetry" }
-openjarvis-learning = { path = "../openjarvis-learning" }
-openjarvis-mcp = { path = "../openjarvis-mcp" }
-openjarvis-sessions = { path = "../openjarvis-sessions" }
-openjarvis-workflow = { path = "../openjarvis-workflow" }
-openjarvis-skills = { path = "../openjarvis-skills" }
-openjarvis-recipes = { path = "../openjarvis-recipes" }
-openjarvis-templates = { path = "../openjarvis-templates" }
-openjarvis-a2a = { path = "../openjarvis-a2a" }
-openjarvis-scheduler = { path = "../openjarvis-scheduler" }
+hope-core = { path = "../hope-core" }
+hope-engine = { path = "../hope-engine" }
+hope-security = { path = "../hope-security" }
+hope-tools = { path = "../hope-tools" }
+hope-agents = { path = "../hope-agents" }
+hope-traces = { path = "../hope-traces" }
+hope-telemetry = { path = "../hope-telemetry" }
+hope-learning = { path = "../hope-learning" }
+hope-mcp = { path = "../hope-mcp" }
+hope-sessions = { path = "../hope-sessions" }
+hope-workflow = { path = "../hope-workflow" }
+hope-skills = { path = "../hope-skills" }
+hope-recipes = { path = "../hope-recipes" }
+hope-templates = { path = "../hope-templates" }
+hope-a2a = { path = "../hope-a2a" }
+hope-scheduler = { path = "../hope-scheduler" }
 pyo3 = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

@@ -254,7 +254,7 @@ export function SystemPanel() {
           </button>
 
           <a
-            href="https://open-jarvis.github.io/OpenJarvis/leaderboard"
+            href="https://open-hope.github.io/Hope/leaderboard"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-1.5 mt-1.5 px-3 py-1.5 text-[11px] rounded-lg transition-colors"

@@ -4,8 +4,8 @@
 //! New code should use `crate::utils::strip_think_tags()` and
 //! `crate::utils::check_continuation()` directly.
 
-use openjarvis_core::{GenerateResult, Message};
-use openjarvis_engine::traits::InferenceEngine;
+use hope_core::{GenerateResult, Message};
+use hope_engine::traits::InferenceEngine;
 
 pub struct AgentHelpers<E: InferenceEngine> {
     engine: E,
@@ -40,7 +40,7 @@ impl<E: InferenceEngine> AgentHelpers<E> {
         &self,
         messages: &[Message],
         extra: Option<&serde_json::Value>,
-    ) -> Result<GenerateResult, openjarvis_core::OpenJarvisError> {
+    ) -> Result<GenerateResult, hope_core::HopeError> {
         self.engine.generate(messages, &self.model, self.temperature, self.max_tokens, extra)
     }
 
@@ -64,7 +64,7 @@ impl<E: InferenceEngine> AgentHelpers<E> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use openjarvis_engine::Engine;
+    use hope_engine::Engine;
 
     #[test]
     fn test_strip_think_tags() {

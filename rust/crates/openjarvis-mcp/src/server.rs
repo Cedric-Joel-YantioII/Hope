@@ -1,7 +1,7 @@
 //! MCP server — handles JSON-RPC tool discovery and invocation.
 
 use crate::protocol::{McpRequest, McpResponse};
-use openjarvis_tools::executor::ToolExecutor;
+use hope_tools::executor::ToolExecutor;
 use serde_json::Value;
 use std::sync::Arc;
 
@@ -15,7 +15,7 @@ impl McpServer {
     pub fn new(executor: Arc<ToolExecutor>) -> Self {
         Self {
             executor,
-            server_name: "openjarvis".into(),
+            server_name: "hope".into(),
             server_version: "0.1.0".into(),
         }
     }
@@ -108,11 +108,11 @@ impl McpServer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use openjarvis_tools::builtin::calculator::CalculatorTool;
+    use hope_tools::builtin::calculator::CalculatorTool;
 
     fn make_server() -> McpServer {
         let mut exec = ToolExecutor::new(None, None);
-        exec.register(openjarvis_tools::builtin::BuiltinTool::Calculator(CalculatorTool));
+        exec.register(hope_tools::builtin::BuiltinTool::Calculator(CalculatorTool));
         McpServer::new(Arc::new(exec))
     }
 

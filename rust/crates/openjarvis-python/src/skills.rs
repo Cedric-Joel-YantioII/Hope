@@ -4,7 +4,7 @@ use pyo3::prelude::*;
 
 #[pyclass(name = "SkillManifest")]
 pub struct PySkillManifest {
-    inner: openjarvis_skills::SkillManifest,
+    inner: hope_skills::SkillManifest,
 }
 
 #[pymethods]
@@ -52,13 +52,13 @@ impl PySkillManifest {
             .step_by(2)
             .filter_map(|i| u8::from_str_radix(&public_key_hex[i..i + 2], 16).ok())
             .collect();
-        openjarvis_skills::verify_signature(&self.inner, &key_bytes)
+        hope_skills::verify_signature(&self.inner, &key_bytes)
     }
 }
 
 #[pyfunction]
 pub fn load_skill(toml_str: &str) -> PyResult<PySkillManifest> {
-    let manifest = openjarvis_skills::load_skill(toml_str)
+    let manifest = hope_skills::load_skill(toml_str)
         .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e))?;
     Ok(PySkillManifest { inner: manifest })
 }

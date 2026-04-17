@@ -1,6 +1,6 @@
-//! Canonical data types shared across all OpenJarvis primitives.
+//! Canonical data types shared across all Hope primitives.
 //!
-//! Direct Rust translation of `src/openjarvis/core/types.py`.
+//! Direct Rust translation of `src/hope/core/types.py`.
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

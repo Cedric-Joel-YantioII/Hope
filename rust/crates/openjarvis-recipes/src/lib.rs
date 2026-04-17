@@ -1,9 +1,9 @@
-//! OpenJarvis Recipes — composable TOML configs that wire all five primitives.
+//! Hope Recipes — composable TOML configs that wire all five primitives.
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-/// A composable recipe that configures the full OpenJarvis stack.
+/// A composable recipe that configures the full Hope stack.
 ///
 /// Mirrors the Python `Recipe` dataclass — every field beyond `name` is optional
 /// so that a recipe can specify only the axes it cares about.

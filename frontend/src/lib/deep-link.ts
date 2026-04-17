@@ -1,13 +1,13 @@
 /**
- * deep-link.ts — Handler for openjarvis:// deep links in the Tauri desktop app.
+ * deep-link.ts — Handler for hope:// deep links in the Tauri desktop app.
  *
  * The Tauri deep-link plugin routes custom-scheme URLs to the frontend.
  * This module parses those URLs and extracts structured navigation targets
  * so the UI can respond (e.g. open a research session, navigate to a connector).
  *
  * Supported URL formats:
- *   openjarvis://research/{session_id}   → open a research session
- *   openjarvis://connector/{connector_id} → open a connector settings panel
+ *   hope://research/{session_id}   → open a research session
+ *   hope://connector/{connector_id} → open a connector settings panel
  */
 
 export interface DeepLinkTarget {
@@ -18,17 +18,17 @@ export interface DeepLinkTarget {
 }
 
 /**
- * Parse an `openjarvis://` deep link URL into a structured target.
+ * Parse an `hope://` deep link URL into a structured target.
  *
- * @param url - The raw deep link URL string (e.g. `openjarvis://research/abc123`).
+ * @param url - The raw deep link URL string (e.g. `hope://research/abc123`).
  * @returns A {@link DeepLinkTarget} if the URL is valid, or `null` if it
- *   cannot be parsed or does not use the `openjarvis:` scheme.
+ *   cannot be parsed or does not use the `hope:` scheme.
  *
  * @example
- * parseDeepLink("openjarvis://research/abc123");
+ * parseDeepLink("hope://research/abc123");
  * // → { type: "research", id: "abc123" }
  *
- * parseDeepLink("openjarvis://connector/gmail");
+ * parseDeepLink("hope://connector/gmail");
  * // → { type: "connector", id: "gmail" }
  *
  * parseDeepLink("https://example.com");
@@ -37,9 +37,9 @@ export interface DeepLinkTarget {
 export function parseDeepLink(url: string): DeepLinkTarget | null {
   try {
     const parsed = new URL(url);
-    if (parsed.protocol !== "openjarvis:") return null;
+    if (parsed.protocol !== "hope:") return null;
 
-    // The URL constructor treats "openjarvis://research/abc123" such that
+    // The URL constructor treats "hope://research/abc123" such that
     // parsed.hostname === "research" and parsed.pathname === "/abc123".
     // We also handle the double-slash form where both end up in pathname.
     const parts = parsed.pathname.replace(/^\/\//, "").split("/").filter(Boolean);

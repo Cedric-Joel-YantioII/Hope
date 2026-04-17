@@ -1,6 +1,6 @@
-//! LLM-based optimizer for OpenJarvis configuration tuning.
+//! LLM-based optimizer for Hope configuration tuning.
 //!
-//! Rust translation of `src/openjarvis/learning/optimize/llm_optimizer.py`.
+//! Rust translation of `src/hope/learning/optimize/llm_optimizer.py`.
 //!
 //! The actual LLM call is abstracted via the [`OptimizerBackend`] trait so
 //! that Python can provide the implementation via FFI / PyO3.
@@ -34,7 +34,7 @@ pub trait OptimizerBackend: Send + Sync {
 // LLMOptimizer
 // ---------------------------------------------------------------------------
 
-/// Uses an LLM to propose optimal OpenJarvis configurations.
+/// Uses an LLM to propose optimal Hope configurations.
 ///
 /// Inspired by DSPy's GEPA: uses textual feedback from execution traces
 /// rather than just scalar rewards to guide the optimizer.
@@ -232,7 +232,7 @@ impl LLMOptimizer {
     ) -> TrialFeedback {
         if let Some(ref backend) = self.backend {
             let prompt = format!(
-                "Analyze this OpenJarvis evaluation result.\n\n\
+                "Analyze this Hope evaluation result.\n\n\
                  ## Configuration\n{}\n\n\
                  ## Results\n- accuracy: {accuracy:.4}\n\
                  - mean_latency_seconds: {mean_latency_seconds:.4}\n\
@@ -272,7 +272,7 @@ impl LLMOptimizer {
     #[allow(clippy::vec_init_then_push)]
     fn build_initial_prompt(&self) -> String {
         let mut lines = Vec::new();
-        lines.push("You are optimizing an OpenJarvis AI system configuration.".into());
+        lines.push("You are optimizing an Hope AI system configuration.".into());
         lines.push(String::new());
         lines.push(self.search_space.to_prompt_description());
         lines.push("## Objective".into());
@@ -307,7 +307,7 @@ impl LLMOptimizer {
         frontier_ids: Option<&HashSet<String>>,
     ) -> String {
         let mut lines = Vec::new();
-        lines.push("You are optimizing an OpenJarvis AI system configuration.".into());
+        lines.push("You are optimizing an Hope AI system configuration.".into());
         lines.push(String::new());
         lines.push(self.search_space.to_prompt_description());
 
@@ -351,7 +351,7 @@ impl LLMOptimizer {
         frontier_ids: Option<&HashSet<String>>,
     ) -> String {
         let mut lines = Vec::new();
-        lines.push("You are optimizing an OpenJarvis AI system configuration.".into());
+        lines.push("You are optimizing an Hope AI system configuration.".into());
         lines.push(String::new());
         lines.push(self.search_space.to_prompt_description());
 
@@ -390,7 +390,7 @@ impl LLMOptimizer {
         frontier_ids: Option<&HashSet<String>>,
     ) -> String {
         let mut lines = Vec::new();
-        lines.push("You are optimizing an OpenJarvis AI system configuration.".into());
+        lines.push("You are optimizing an Hope AI system configuration.".into());
         lines.push(String::new());
         lines.push(self.search_space.to_prompt_description());
 

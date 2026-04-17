@@ -1,6 +1,6 @@
-//! OpenJarvis Sessions — cross-channel persistent session management.
+//! Hope Sessions — cross-channel persistent session management.
 //!
-//! Port of `src/openjarvis/sessions/` from Python.
+//! Port of `src/hope/sessions/` from Python.
 //! Provides SQLite-backed session storage with identity consolidation,
 //! message decay, and cross-channel user linking.
 

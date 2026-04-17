@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from openjarvis.security.capabilities import (
+from hope.security.capabilities import (
     DEFAULT_TOOL_CAPABILITIES,
     Capability,
     CapabilityPolicy,

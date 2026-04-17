@@ -1,6 +1,6 @@
 //! TraceStore — SQLite persistence for traces.
 
-use openjarvis_core::{OpenJarvisError, Trace};
+use hope_core::{HopeError, Trace};
 use parking_lot::Mutex;
 use rusqlite::Connection;
 use std::path::{Path, PathBuf};
@@ -11,15 +11,15 @@ pub struct TraceStore {
 }
 
 impl TraceStore {
-    pub fn new(db_path: &Path) -> Result<Self, OpenJarvisError> {
+    pub fn new(db_path: &Path) -> Result<Self, HopeError> {
         if let Some(parent) = db_path.parent() {
             std::fs::create_dir_all(parent).map_err(|e| {
-                OpenJarvisError::Io(std::io::Error::other(e))
+                HopeError::Io(std::io::Error::other(e))
             })?;
         }
 
         let conn = Connection::open(db_path).map_err(|e| {
-            OpenJarvisError::Io(std::io::Error::other(e.to_string()))
+            HopeError::Io(std::io::Error::other(e.to_string()))
         })?;
 
         conn.execute_batch(
@@ -41,7 +41,7 @@ impl TraceStore {
             )",
         )
         .map_err(|e| {
-            OpenJarvisError::Io(std::io::Error::other(e.to_string()))
+            HopeError::Io(std::io::Error::other(e.to_string()))
         })?;
 
         Ok(Self {
@@ -50,11 +50,11 @@ impl TraceStore {
         })
     }
 
-    pub fn in_memory() -> Result<Self, OpenJarvisError> {
+    pub fn in_memory() -> Result<Self, HopeError> {
         Self::new(Path::new(":memory:"))
     }
 
-    pub fn save(&self, trace: &Trace) -> Result<(), OpenJarvisError> {
+    pub fn save(&self, trace: &Trace) -> Result<(), HopeError> {
         let steps_json = serde_json::to_string(&trace.steps).unwrap_or_default();
         let metadata_json = serde_json::to_string(&trace.metadata).unwrap_or_default();
 
@@ -83,13 +83,13 @@ impl TraceStore {
             ],
         )
         .map_err(|e| {
-            OpenJarvisError::Io(std::io::Error::other(e.to_string()))
+            HopeError::Io(std::io::Error::other(e.to_string()))
         })?;
 
         Ok(())
     }
 
-    pub fn get(&self, trace_id: &str) -> Result<Option<Trace>, OpenJarvisError> {
+    pub fn get(&self, trace_id: &str) -> Result<Option<Trace>, HopeError> {
         let conn = self.conn.lock();
         let mut stmt = conn
             .prepare(
@@ -99,7 +99,7 @@ impl TraceStore {
                  FROM traces WHERE trace_id = ?1",
             )
             .map_err(|e| {
-                OpenJarvisError::Io(std::io::Error::other(
+                HopeError::Io(std::io::Error::other(
                     e.to_string(),
                 ))
             })?;
@@ -140,7 +140,7 @@ impl TraceStore {
         &self,
         limit: usize,
         offset: usize,
-    ) -> Result<Vec<Trace>, OpenJarvisError> {
+    ) -> Result<Vec<Trace>, HopeError> {
         let conn = self.conn.lock();
         let mut stmt = conn
             .prepare(
@@ -150,7 +150,7 @@ impl TraceStore {
                  FROM traces ORDER BY started_at DESC LIMIT ?1 OFFSET ?2",
             )
             .map_err(|e| {
-                OpenJarvisError::Io(std::io::Error::other(
+                HopeError::Io(std::io::Error::other(
                     e.to_string(),
                 ))
             })?;
@@ -183,7 +183,7 @@ impl TraceStore {
                 })
             })
             .map_err(|e| {
-                OpenJarvisError::Io(std::io::Error::other(
+                HopeError::Io(std::io::Error::other(
                     e.to_string(),
                 ))
             })?
@@ -193,12 +193,12 @@ impl TraceStore {
         Ok(traces)
     }
 
-    pub fn count(&self) -> Result<usize, OpenJarvisError> {
+    pub fn count(&self) -> Result<usize, HopeError> {
         let conn = self.conn.lock();
         let count: i64 = conn
             .query_row("SELECT COUNT(*) FROM traces", [], |row| row.get(0))
             .map_err(|e| {
-                OpenJarvisError::Io(std::io::Error::other(
+                HopeError::Io(std::io::Error::other(
                     e.to_string(),
                 ))
             })?;

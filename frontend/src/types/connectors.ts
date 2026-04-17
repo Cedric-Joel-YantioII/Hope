@@ -88,7 +88,7 @@ export const SOURCE_CATALOG: ConnectorMeta[] = [
         urlLabel: 'Open Google Security \u2192',
       },
       {
-        label: 'Go to App Passwords. Select app: "Mail", device: "Other" and type "OpenJarvis". Click Generate. This does NOT open a login popup \u2014 you\'ll get a 16-character password to copy (you won\'t see it again).',
+        label: 'Go to App Passwords. Select app: "Mail", device: "Other" and type "Hope". Click Generate. This does NOT open a login popup \u2014 you\'ll get a 16-character password to copy (you won\'t see it again).',
         url: 'https://myaccount.google.com/apppasswords',
         urlLabel: 'Open App Passwords \u2192',
       },
@@ -117,7 +117,7 @@ export const SOURCE_CATALOG: ConnectorMeta[] = [
     unitLabel: 'messages',
     steps: [
       {
-        label: 'Go to api.slack.com/apps and click "Create New App" → choose "From scratch". Name it "OpenJarvis" and pick your workspace',
+        label: 'Go to api.slack.com/apps and click "Create New App" → choose "From scratch". Name it "Hope" and pick your workspace',
         url: 'https://api.slack.com/apps',
         urlLabel: 'Open Slack Apps',
       },
@@ -131,11 +131,11 @@ export const SOURCE_CATALOG: ConnectorMeta[] = [
         label: 'In the left sidebar, click "Install App" → click "Install to Workspace" → click "Allow". After installing, copy the "Bot User OAuth Token" that appears (starts with xoxb-)',
       },
       {
-        label: 'Paste the bot token below. After connecting, invite the bot to channels you want indexed by typing /invite @OpenJarvis in each channel',
+        label: 'Paste the bot token below. After connecting, invite the bot to channels you want indexed by typing /invite @Hope in each channel',
       },
       {
-        label: '(Optional) Set the app icon: in the left sidebar click "Basic Information" → scroll to "Display Information" → upload the OpenJarvis logo',
-        url: 'https://github.com/open-jarvis/OpenJarvis/blob/main/assets/openjarvis-slack-icon.jpg',
+        label: '(Optional) Set the app icon: in the left sidebar click "Basic Information" → scroll to "Display Information" → upload the Hope logo',
+        url: 'https://github.com/open-hope/Hope/blob/main/assets/hope-slack-icon.jpg',
         urlLabel: 'Download icon',
       },
     ],
@@ -154,7 +154,7 @@ export const SOURCE_CATALOG: ConnectorMeta[] = [
     unitLabel: 'pages',
     steps: [
       {
-        label: 'Go to notion.so/profile/integrations → click "+ New integration". Name it "OpenJarvis", select your workspace, and click Submit',
+        label: 'Go to notion.so/profile/integrations → click "+ New integration". Name it "Hope", select your workspace, and click Submit',
         url: 'https://www.notion.so/profile/integrations',
         urlLabel: 'Open Notion Integrations',
       },
@@ -162,7 +162,7 @@ export const SOURCE_CATALOG: ConnectorMeta[] = [
         label: 'Copy the "Internal Integration Secret" (starts with ntn_) and paste it below',
       },
       {
-        label: 'To share ALL your pages at once: open any top-level page → click "..." (top right) → "Connections" → "Add connections" → search "OpenJarvis" → click it. This shares the page and all its sub-pages. Repeat for each top-level page, or share your entire workspace by doing this on every root page',
+        label: 'To share ALL your pages at once: open any top-level page → click "..." (top right) → "Connections" → "Add connections" → search "Hope" → click it. This shares the page and all its sub-pages. Repeat for each top-level page, or share your entire workspace by doing this on every root page',
       },
       {
         label: 'Tip: if you have a single top-level page that contains everything, sharing just that one page will share all nested sub-pages automatically',
@@ -203,10 +203,10 @@ export const SOURCE_CATALOG: ConnectorMeta[] = [
         label: 'Open the Apple menu () → System Settings → Privacy & Security (in the left sidebar) → scroll down and click "Full Disk Access"',
       },
       {
-        label: 'Click the "+" button at the bottom of the list. Navigate to Applications → Utilities → select "Terminal.app" (or iTerm2/Warp if you use those). If you\'re using the desktop app, also add "OpenJarvis.app" from Applications',
+        label: 'Click the "+" button at the bottom of the list. Navigate to Applications → Utilities → select "Terminal.app" (or iTerm2/Warp if you use those). If you\'re using the desktop app, also add "Hope.app" from Applications',
       },
       {
-        label: 'Toggle the switch ON next to each app you added. Close and reopen your terminal (or restart OpenJarvis). iMessage data will be detected automatically — no credentials needed',
+        label: 'Toggle the switch ON next to each app you added. Close and reopen your terminal (or restart Hope). iMessage data will be detected automatically — no credentials needed',
       },
     ],
   },
@@ -228,7 +228,7 @@ export const SOURCE_CATALOG: ConnectorMeta[] = [
         label: 'Alternatively, open Finder → navigate to your vault folder (it contains a hidden .obsidian directory). Right-click the folder → "Copy as Pathname" to get the full path',
       },
       {
-        label: 'Paste the full path below. OpenJarvis will index all .md files in the vault',
+        label: 'Paste the full path below. Hope will index all .md files in the vault',
       },
     ],
     inputFields: [
@@ -246,7 +246,7 @@ export const SOURCE_CATALOG: ConnectorMeta[] = [
     unitLabel: 'files',
     steps: [
       {
-        label: 'Go to Google Cloud Console → create a new project (or select an existing one). Give it any name (e.g. "OpenJarvis")',
+        label: 'Go to Google Cloud Console → create a new project (or select an existing one). Give it any name (e.g. "Hope")',
         url: 'https://console.cloud.google.com/projectcreate',
         urlLabel: 'Create Project',
       },
@@ -352,10 +352,10 @@ export const SOURCE_CATALOG: ConnectorMeta[] = [
         label: 'Open the Apple menu () → System Settings → Privacy & Security (in the left sidebar) → scroll down and click "Full Disk Access"',
       },
       {
-        label: 'Click the "+" button at the bottom of the list. Navigate to Applications → Utilities → select "Terminal.app" (or iTerm2/Warp if you use those). If you\'re using the desktop app, also add "OpenJarvis.app" from Applications',
+        label: 'Click the "+" button at the bottom of the list. Navigate to Applications → Utilities → select "Terminal.app" (or iTerm2/Warp if you use those). If you\'re using the desktop app, also add "Hope.app" from Applications',
       },
       {
-        label: 'Toggle the switch ON next to each app you added. Close and reopen your terminal (or restart OpenJarvis). Apple Notes will be detected automatically — no credentials needed',
+        label: 'Toggle the switch ON next to each app you added. Close and reopen your terminal (or restart Hope). Apple Notes will be detected automatically — no credentials needed',
       },
     ],
   },
@@ -373,10 +373,10 @@ export const SOURCE_CATALOG: ConnectorMeta[] = [
         label: 'Open the Apple menu () → System Settings → Privacy & Security (in the left sidebar) → scroll down and click "Full Disk Access"',
       },
       {
-        label: 'Click the "+" button at the bottom of the list. Navigate to Applications → Utilities → select "Terminal.app" (or iTerm2/Warp if you use those). If you\'re using the desktop app, also add "OpenJarvis.app" from Applications',
+        label: 'Click the "+" button at the bottom of the list. Navigate to Applications → Utilities → select "Terminal.app" (or iTerm2/Warp if you use those). If you\'re using the desktop app, also add "Hope.app" from Applications',
       },
       {
-        label: 'Toggle the switch ON next to each app you added. Close and reopen your terminal (or restart OpenJarvis). Apple Contacts will be detected automatically — no credentials needed',
+        label: 'Toggle the switch ON next to each app you added. Close and reopen your terminal (or restart Hope). Apple Contacts will be detected automatically — no credentials needed',
       },
     ],
   },
@@ -391,7 +391,7 @@ export const SOURCE_CATALOG: ConnectorMeta[] = [
     unitLabel: 'emails',
     steps: [
       {
-        label: 'Go to the Azure Portal → App Registrations → click "+ New registration". Name it "OpenJarvis", select "Accounts in this organizational directory only", and click Register',
+        label: 'Go to the Azure Portal → App Registrations → click "+ New registration". Name it "Hope", select "Accounts in this organizational directory only", and click Register',
         url: 'https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade',
         urlLabel: 'Open Azure App Registrations',
       },
@@ -421,7 +421,7 @@ export const SOURCE_CATALOG: ConnectorMeta[] = [
     unitLabel: 'files',
     steps: [
       {
-        label: 'Go to the Dropbox App Console and click "Create app". Choose "Scoped access" → "Full Dropbox" → give it a name (e.g. "OpenJarvis") → click "Create app"',
+        label: 'Go to the Dropbox App Console and click "Create app". Choose "Scoped access" → "Full Dropbox" → give it a name (e.g. "Hope") → click "Create app"',
         url: 'https://www.dropbox.com/developers/apps/create',
         urlLabel: 'Open Dropbox App Console',
       },

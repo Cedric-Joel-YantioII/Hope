@@ -3,8 +3,8 @@
 use crate::traits::InferenceEngine;
 use crate::ollama::OllamaEngine;
 use crate::openai_compat::OpenAICompatEngine;
-use openjarvis_core::config::JarvisConfig;
-use openjarvis_core::OpenJarvisError;
+use hope_core::config::HopeConfig;
+use hope_core::HopeError;
 
 /// Engine endpoint descriptor discovered at runtime.
 #[derive(Debug, Clone)]
@@ -16,7 +16,7 @@ pub struct EngineInfo {
 }
 
 /// Probe known engine endpoints and return those that respond.
-pub fn discover_engines(config: &JarvisConfig) -> Vec<EngineInfo> {
+pub fn discover_engines(config: &HopeConfig) -> Vec<EngineInfo> {
     let mut found = Vec::new();
 
     let ollama_host = &config.engine.ollama.host;
@@ -61,9 +61,9 @@ pub fn discover_engines(config: &JarvisConfig) -> Vec<EngineInfo> {
 
 /// Get a configured engine instance by key (static dispatch via `Engine` enum).
 pub fn get_engine_static(
-    config: &JarvisConfig,
+    config: &HopeConfig,
     engine_key: Option<&str>,
-) -> Result<crate::engine_enum::Engine, OpenJarvisError> {
+) -> Result<crate::engine_enum::Engine, HopeError> {
     use crate::engine_enum::Engine;
 
     let key = engine_key
@@ -102,8 +102,8 @@ pub fn get_engine_static(
         "apple_fm" => Ok(Engine::AppleFm(OpenAICompatEngine::apple_fm(
             &config.engine.apple_fm.host,
         ))),
-        other => Err(OpenJarvisError::Engine(
-            openjarvis_core::error::EngineError::ModelNotFound(format!(
+        other => Err(HopeError::Engine(
+            hope_core::error::EngineError::ModelNotFound(format!(
                 "Unknown engine: {}",
                 other
             )),
@@ -114,18 +114,18 @@ pub fn get_engine_static(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use openjarvis_core::config::JarvisConfig;
+    use hope_core::config::HopeConfig;
 
     #[test]
     fn test_get_engine_static_ollama() {
-        let config = JarvisConfig::default();
+        let config = HopeConfig::default();
         let engine = get_engine_static(&config, Some("ollama")).unwrap();
         assert_eq!(engine.engine_id(), "ollama");
     }
 
     #[test]
     fn test_get_engine_static_unknown() {
-        let config = JarvisConfig::default();
+        let config = HopeConfig::default();
         assert!(get_engine_static(&config, Some("nonexistent")).is_err());
     }
 }

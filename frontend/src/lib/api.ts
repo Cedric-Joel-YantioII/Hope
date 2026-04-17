@@ -17,7 +17,7 @@ export const isTauri = () => typeof window !== 'undefined' && !!window.__TAURI_I
 
 // Cached API base URL fetched from the Tauri backend at startup.
 // This avoids hardcoding the port — the Rust backend is the single
-// source of truth for JARVIS_PORT.
+// source of truth for HOPE_PORT.
 let _tauriApiBase: string | null = null;
 
 /** Pre-fetch the API base URL from the Tauri backend (call once at init). */
@@ -35,7 +35,7 @@ const DESKTOP_API_FALLBACK = 'http://127.0.0.1:8000';
 
 const getSettingsApiUrl = (): string => {
   try {
-    const raw = localStorage.getItem('openjarvis-settings');
+    const raw = localStorage.getItem('hope-settings');
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed.apiUrl) return parsed.apiUrl.replace(/\/+$/, '');

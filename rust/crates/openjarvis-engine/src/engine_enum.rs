@@ -9,8 +9,8 @@ use crate::openai_compat::OpenAICompatEngine;
 use crate::sglang::SGLangEngine;
 use crate::vllm::VLLMEngine;
 use crate::traits::{InferenceEngine, TokenStream};
-use openjarvis_core::error::OpenJarvisError;
-use openjarvis_core::{GenerateResult, Message};
+use hope_core::error::HopeError;
+use hope_core::{GenerateResult, Message};
 use serde_json::Value;
 
 /// Closed enum of all supported inference engine backends.
@@ -71,7 +71,7 @@ impl InferenceEngine for Engine {
         temperature: f64,
         max_tokens: i64,
         extra: Option<&Value>,
-    ) -> Result<GenerateResult, OpenJarvisError> {
+    ) -> Result<GenerateResult, HopeError> {
         delegate_engine!(self, generate, messages, model, temperature, max_tokens, extra)
     }
 
@@ -82,7 +82,7 @@ impl InferenceEngine for Engine {
         temperature: f64,
         max_tokens: i64,
         extra: Option<&Value>,
-    ) -> Result<TokenStream, OpenJarvisError> {
+    ) -> Result<TokenStream, HopeError> {
         match self {
             Engine::Ollama(e) => e.stream(messages, model, temperature, max_tokens, extra).await,
             Engine::VLLM(e) => e.stream(messages, model, temperature, max_tokens, extra).await,
@@ -100,7 +100,7 @@ impl InferenceEngine for Engine {
         }
     }
 
-    fn list_models(&self) -> Result<Vec<String>, OpenJarvisError> {
+    fn list_models(&self) -> Result<Vec<String>, HopeError> {
         delegate_engine!(self, list_models)
     }
 

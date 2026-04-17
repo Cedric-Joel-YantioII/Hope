@@ -7,18 +7,18 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from openjarvis.channels._stubs import ChannelStatus
-from openjarvis.channels.line_channel import LineChannel
-from openjarvis.channels.mastodon_channel import MastodonChannel
-from openjarvis.channels.messenger_channel import MessengerChannel
-from openjarvis.channels.nostr_channel import NostrChannel
-from openjarvis.channels.reddit_channel import RedditChannel
-from openjarvis.channels.rocketchat_channel import RocketChatChannel
-from openjarvis.channels.twitch_channel import TwitchChannel
-from openjarvis.channels.viber_channel import ViberChannel
-from openjarvis.channels.xmpp_channel import XMPPChannel
-from openjarvis.channels.zulip_channel import ZulipChannel
-from openjarvis.core.registry import ChannelRegistry
+from hope.channels._stubs import ChannelStatus
+from hope.channels.line_channel import LineChannel
+from hope.channels.mastodon_channel import MastodonChannel
+from hope.channels.messenger_channel import MessengerChannel
+from hope.channels.nostr_channel import NostrChannel
+from hope.channels.reddit_channel import RedditChannel
+from hope.channels.rocketchat_channel import RocketChatChannel
+from hope.channels.twitch_channel import TwitchChannel
+from hope.channels.viber_channel import ViberChannel
+from hope.channels.xmpp_channel import XMPPChannel
+from hope.channels.zulip_channel import ZulipChannel
+from hope.core.registry import ChannelRegistry
 
 # (class, registry key, library module name, pip package name)
 CHANNELS = [

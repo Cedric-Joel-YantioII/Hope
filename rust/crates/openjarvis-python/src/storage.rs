@@ -1,11 +1,11 @@
 //! PyO3 bindings for storage/memory backends.
 
-use openjarvis_tools::storage::MemoryBackend;
+use hope_tools::storage::MemoryBackend;
 use pyo3::prelude::*;
 
 #[pyclass(name = "SQLiteMemory")]
 pub struct PySQLiteMemory {
-    inner: openjarvis_tools::storage::SQLiteMemory,
+    inner: hope_tools::storage::SQLiteMemory,
 }
 
 #[pymethods]
@@ -13,7 +13,7 @@ impl PySQLiteMemory {
     #[new]
     #[pyo3(signature = (path=":memory:"))]
     fn new(path: &str) -> PyResult<Self> {
-        let inner = openjarvis_tools::storage::SQLiteMemory::new(std::path::Path::new(path))
+        let inner = hope_tools::storage::SQLiteMemory::new(std::path::Path::new(path))
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
         Ok(Self { inner })
     }
@@ -63,7 +63,7 @@ impl PySQLiteMemory {
 
 #[pyclass(name = "BM25Memory")]
 pub struct PyBM25Memory {
-    inner: openjarvis_tools::storage::BM25Memory,
+    inner: hope_tools::storage::BM25Memory,
 }
 
 #[pymethods]
@@ -72,7 +72,7 @@ impl PyBM25Memory {
     #[pyo3(signature = (k1=1.2, b=0.75))]
     fn new(k1: f64, b: f64) -> Self {
         Self {
-            inner: openjarvis_tools::storage::BM25Memory::new(k1, b),
+            inner: hope_tools::storage::BM25Memory::new(k1, b),
         }
     }
 
@@ -109,7 +109,7 @@ impl PyBM25Memory {
 
 #[pyclass(name = "FAISSMemory")]
 pub struct PyFAISSMemory {
-    inner: openjarvis_tools::storage::FAISSMemory,
+    inner: hope_tools::storage::FAISSMemory,
 }
 
 #[pymethods]
@@ -117,7 +117,7 @@ impl PyFAISSMemory {
     #[new]
     #[pyo3(signature = (path=":memory:", dim=128))]
     fn new(path: &str, dim: usize) -> PyResult<Self> {
-        let inner = openjarvis_tools::storage::FAISSMemory::new(std::path::Path::new(path), dim)
+        let inner = hope_tools::storage::FAISSMemory::new(std::path::Path::new(path), dim)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
         Ok(Self { inner })
     }
@@ -167,7 +167,7 @@ impl PyFAISSMemory {
 
 #[pyclass(name = "ColBERTMemory")]
 pub struct PyColBERTMemory {
-    inner: openjarvis_tools::storage::ColBERTMemory,
+    inner: hope_tools::storage::ColBERTMemory,
 }
 
 #[pymethods]
@@ -176,7 +176,7 @@ impl PyColBERTMemory {
     #[pyo3(signature = (path=":memory:", token_dim=64))]
     fn new(path: &str, token_dim: usize) -> PyResult<Self> {
         let inner =
-            openjarvis_tools::storage::ColBERTMemory::new(std::path::Path::new(path), token_dim)
+            hope_tools::storage::ColBERTMemory::new(std::path::Path::new(path), token_dim)
                 .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
         Ok(Self { inner })
     }
@@ -226,7 +226,7 @@ impl PyColBERTMemory {
 
 #[pyclass(name = "HybridMemory")]
 pub struct PyHybridMemory {
-    inner: openjarvis_tools::storage::HybridMemory,
+    inner: hope_tools::storage::HybridMemory,
 }
 
 #[pymethods]
@@ -242,7 +242,7 @@ impl PyHybridMemory {
         for key in &backend_keys {
             let backend: Box<dyn MemoryBackend> = match key.as_str() {
                 "sqlite" => {
-                    let m = openjarvis_tools::storage::SQLiteMemory::new(
+                    let m = hope_tools::storage::SQLiteMemory::new(
                         std::path::Path::new(":memory:"),
                     )
                     .map_err(|e| {
@@ -250,16 +250,16 @@ impl PyHybridMemory {
                     })?;
                     Box::new(m)
                 }
-                "bm25" => Box::new(openjarvis_tools::storage::BM25Memory::default()),
+                "bm25" => Box::new(hope_tools::storage::BM25Memory::default()),
                 "faiss" => {
-                    let m = openjarvis_tools::storage::FAISSMemory::in_memory().map_err(|e| {
+                    let m = hope_tools::storage::FAISSMemory::in_memory().map_err(|e| {
                         PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string())
                     })?;
                     Box::new(m)
                 }
                 "colbert" => {
                     let m =
-                        openjarvis_tools::storage::ColBERTMemory::in_memory().map_err(|e| {
+                        hope_tools::storage::ColBERTMemory::in_memory().map_err(|e| {
                             PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string())
                         })?;
                     Box::new(m)
@@ -274,7 +274,7 @@ impl PyHybridMemory {
             backends.push(backend);
         }
         Ok(Self {
-            inner: openjarvis_tools::storage::HybridMemory::new(backends),
+            inner: hope_tools::storage::HybridMemory::new(backends),
         })
     }
 
@@ -311,7 +311,7 @@ impl PyHybridMemory {
 
 #[pyclass(name = "KnowledgeGraphMemory")]
 pub struct PyKnowledgeGraphMemory {
-    inner: openjarvis_tools::storage::KnowledgeGraphMemory,
+    inner: hope_tools::storage::KnowledgeGraphMemory,
 }
 
 #[pymethods]
@@ -319,7 +319,7 @@ impl PyKnowledgeGraphMemory {
     #[new]
     #[pyo3(signature = (path=":memory:"))]
     fn new(path: &str) -> PyResult<Self> {
-        let inner = openjarvis_tools::storage::KnowledgeGraphMemory::new(std::path::Path::new(path))
+        let inner = hope_tools::storage::KnowledgeGraphMemory::new(std::path::Path::new(path))
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
         Ok(Self { inner })
     }

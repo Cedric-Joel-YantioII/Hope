@@ -5,9 +5,9 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
-from openjarvis.core.events import EventBus, EventType
-from openjarvis.core.types import TelemetryRecord
-from openjarvis.telemetry.store import TelemetryStore
+from hope.core.events import EventBus, EventType
+from hope.core.types import TelemetryRecord
+from hope.telemetry.store import TelemetryStore
 
 
 class TestTelemetryStore:

@@ -1,12 +1,12 @@
 # Simple Chat — lightweight conversational AI, no tools
-# Copy to ~/.openjarvis/config.toml
+# Copy to ~/.hope/config.toml
 #
 # The fastest setup: just Ollama + a model.
 #
 # Usage:
-#   jarvis ask "What is quantum computing?"
-#   jarvis chat                  # interactive chat session
-#   jarvis serve                 # start API server for browser/desktop app
+#   hope ask "What is quantum computing?"
+#   hope chat                  # interactive chat session
+#   hope serve                 # start API server for browser/desktop app
 
 [engine]
 default = "ollama"

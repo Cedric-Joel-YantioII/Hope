@@ -60,7 +60,7 @@ site/
 # Frontend
 frontend/node_modules/
 frontend/dist/
-src/openjarvis/server/static/
+src/hope/server/static/
 
 # Desktop (Tauri)
 frontend/src-tauri/target/
@@ -90,7 +90,7 @@ CLAUDE.md
 # Research output
 research_mining_*
 .python-version
-src/openjarvis/channels/whatsapp_baileys_bridge/node_modules/
+src/hope/channels/whatsapp_baileys_bridge/node_modules/
 
 # SQLite in-memory artifacts
 :memory:

@@ -5,11 +5,11 @@ from __future__ import annotations
 import httpx
 import pytest
 
-from openjarvis.core.registry import EngineRegistry
-from openjarvis.core.types import Message, Role
-from openjarvis.engine._base import EngineConnectionError
-from openjarvis.engine.ollama import OllamaEngine
-from openjarvis.engine.openai_compat_engines import (
+from hope.core.registry import EngineRegistry
+from hope.core.types import Message, Role
+from hope.engine._base import EngineConnectionError
+from hope.engine.ollama import OllamaEngine
+from hope.engine.openai_compat_engines import (
     AppleFmEngine,
     ExoEngine,
     LemonadeEngine,

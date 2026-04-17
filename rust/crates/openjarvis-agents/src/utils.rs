@@ -1,6 +1,6 @@
 //! Agent utilities — shared helper functions for all agent implementations.
 
-use openjarvis_core::GenerateResult;
+use hope_core::GenerateResult;
 use regex::Regex;
 
 /// Strip `<think>...</think>` tags from model output.

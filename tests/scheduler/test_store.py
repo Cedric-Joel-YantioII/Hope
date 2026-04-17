@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from openjarvis.scheduler.store import SchedulerStore
+from hope.scheduler.store import SchedulerStore
 
 
 @pytest.fixture()

@@ -1,6 +1,6 @@
 //! TrainingDataMiner — extract supervised training pairs from trace data.
 //!
-//! Ported from Python `openjarvis.learning.training.data`.
+//! Ported from Python `hope.learning.training.data`.
 //! File I/O stays in Python; this module provides pure data extraction.
 
 use crate::trace_policy::classify_query;

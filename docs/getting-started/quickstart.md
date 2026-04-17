@@ -1,6 +1,6 @@
 ---
 title: Quick Start
-description: Get up and running with OpenJarvis in minutes
+description: Get up and running with Hope in minutes
 search:
   boost: 3
 ---
@@ -9,75 +9,75 @@ search:
 
 ## What You Can Build
 
-OpenJarvis is a modular AI assistant framework. Here's what developers build with it:
+Hope is a modular AI assistant framework. Here's what developers build with it:
 
 === "Chat with Any Model"
 
     ```bash
-    jarvis ask "Explain quantum entanglement" -m qwen3:8b
+    hope ask "Explain quantum entanglement" -m qwen3:8b
     ```
 
 === "Agent + Tools"
 
     ```bash
-    jarvis ask --agent orchestrator --tools calculator,web_search "What is the GDP of France in USD?"
+    hope ask --agent orchestrator --tools calculator,web_search "What is the GDP of France in USD?"
     ```
 
 === "Index Docs & Ask"
 
     ```bash
-    jarvis memory index ./docs/
-    jarvis ask "How do I configure the engine?"
+    hope memory index ./docs/
+    hope ask "How do I configure the engine?"
     ```
 
 === "5-Line Python SDK"
 
     ```python
-    from openjarvis import Jarvis
-    with Jarvis() as j:
+    from hope import Hope
+    with Hope() as j:
         print(j.ask("Hello!"))
     ```
 
 === "API Server"
 
     ```bash
-    jarvis serve --port 8000
+    hope serve --port 8000
     # Now use any OpenAI-compatible client
     ```
 
 === "Morning Digest"
 
     ```bash
-    cp configs/openjarvis/examples/morning-digest-mac.toml ~/.openjarvis/config.toml
-    jarvis connect gdrive       # one OAuth flow for Gmail, Calendar, Tasks
-    CARTESIA_API_KEY="..." jarvis digest --fresh
+    cp configs/hope/examples/morning-digest-mac.toml ~/.hope/config.toml
+    hope connect gdrive       # one OAuth flow for Gmail, Calendar, Tasks
+    CARTESIA_API_KEY="..." hope digest --fresh
     # Plays a spoken daily briefing with your email, calendar, health, and news
     ```
 
 === "Deep Research"
 
     ```bash
-    jarvis init --preset deep-research
-    jarvis memory index ~/Documents/papers/
-    jarvis ask "Summarize all documents about transformer architectures"
+    hope init --preset deep-research
+    hope memory index ~/Documents/papers/
+    hope ask "Summarize all documents about transformer architectures"
     # Multi-hop search across your indexed docs with citations
     ```
 
 === "Code Assistant"
 
     ```bash
-    jarvis init --preset code-assistant
-    jarvis ask "Write a Python script that parses CSV files"
+    hope init --preset code-assistant
+    hope ask "Write a Python script that parses CSV files"
     # Orchestrator agent with code execution, file I/O, and shell access
     ```
 
 === "Scheduled Monitor"
 
     ```bash
-    jarvis init --preset scheduled-monitor
-    jarvis memory index ~/Documents/
-    jarvis scheduler start
-    jarvis scheduler create \
+    hope init --preset scheduled-monitor
+    hope memory index ~/Documents/
+    hope scheduler start
+    hope scheduler create \
       --prompt "Check for new emails about Project X" \
       --schedule "0 9 * * 1-5" --agent operative
     # Persistent agent that runs on a cron schedule
@@ -87,36 +87,36 @@ For complete copy-paste patterns, see [Code Snippets](snippets.md).
 
 ## Starter Configs
 
-Copy one of these to `~/.openjarvis/config.toml` to get a pre-configured setup:
+Copy one of these to `~/.hope/config.toml` to get a pre-configured setup:
 
 | Config | For | What it does |
 |--------|-----|-------------|
-| [`chat-simple.toml`](https://github.com/open-jarvis/OpenJarvis/blob/main/configs/openjarvis/examples/chat-simple.toml) | Any machine | Lightweight chat, no tools -- simplest setup |
-| [`code-assistant.toml`](https://github.com/open-jarvis/OpenJarvis/blob/main/configs/openjarvis/examples/code-assistant.toml) | Any machine | Orchestrator agent with code execution, file I/O, shell |
-| [`deep-research.toml`](https://github.com/open-jarvis/OpenJarvis/blob/main/configs/openjarvis/examples/deep-research.toml) | Any machine | Multi-hop research across indexed documents with citations |
-| [`scheduled-monitor.toml`](https://github.com/open-jarvis/OpenJarvis/blob/main/configs/openjarvis/examples/scheduled-monitor.toml) | Any machine | Persistent operative agent on a cron schedule |
-| [`morning-digest-mac.toml`](https://github.com/open-jarvis/OpenJarvis/blob/main/configs/openjarvis/examples/morning-digest-mac.toml) | Mac (Apple Silicon) | Daily spoken briefing from email, calendar, health, news |
-| [`morning-digest-linux.toml`](https://github.com/open-jarvis/OpenJarvis/blob/main/configs/openjarvis/examples/morning-digest-linux.toml) | Linux / GPU server | Same, with vLLM support |
-| [`morning-digest-minimal.toml`](https://github.com/open-jarvis/OpenJarvis/blob/main/configs/openjarvis/examples/morning-digest-minimal.toml) | Any machine | Just Gmail + Calendar |
+| [`chat-simple.toml`](https://github.com/open-hope/Hope/blob/main/configs/hope/examples/chat-simple.toml) | Any machine | Lightweight chat, no tools -- simplest setup |
+| [`code-assistant.toml`](https://github.com/open-hope/Hope/blob/main/configs/hope/examples/code-assistant.toml) | Any machine | Orchestrator agent with code execution, file I/O, shell |
+| [`deep-research.toml`](https://github.com/open-hope/Hope/blob/main/configs/hope/examples/deep-research.toml) | Any machine | Multi-hop research across indexed documents with citations |
+| [`scheduled-monitor.toml`](https://github.com/open-hope/Hope/blob/main/configs/hope/examples/scheduled-monitor.toml) | Any machine | Persistent operative agent on a cron schedule |
+| [`morning-digest-mac.toml`](https://github.com/open-hope/Hope/blob/main/configs/hope/examples/morning-digest-mac.toml) | Mac (Apple Silicon) | Daily spoken briefing from email, calendar, health, news |
+| [`morning-digest-linux.toml`](https://github.com/open-hope/Hope/blob/main/configs/hope/examples/morning-digest-linux.toml) | Linux / GPU server | Same, with vLLM support |
+| [`morning-digest-minimal.toml`](https://github.com/open-hope/Hope/blob/main/configs/hope/examples/morning-digest-minimal.toml) | Any machine | Just Gmail + Calendar |
 
 Or generate a config with digest included:
 
 ```bash
-jarvis init --digest
+hope init --digest
 ```
 
-This guide walks through the core workflows of OpenJarvis: the browser app, CLI, Python SDK, agents with tools, memory, benchmarks, and the API server.
+This guide walks through the core workflows of Hope: the browser app, CLI, Python SDK, agents with tools, memory, benchmarks, and the API server.
 
 !!! info "Prerequisites"
-    Make sure you have [installed OpenJarvis](installation.md) and have at least one inference backend running (e.g., `ollama serve`).
+    Make sure you have [installed Hope](installation.md) and have at least one inference backend running (e.g., `ollama serve`).
 
 ## Browser App
 
-The quickest way to experience OpenJarvis is the full chat UI running in your browser:
+The quickest way to experience Hope is the full chat UI running in your browser:
 
 ```bash
-git clone https://github.com/open-jarvis/OpenJarvis.git
-cd OpenJarvis
+git clone https://github.com/open-hope/Hope.git
+cd Hope
 ./scripts/quickstart.sh
 ```
 
@@ -126,17 +126,17 @@ You get a ChatGPT-like interface with streaming responses, tool use, energy moni
 To stop all services, press ++ctrl+c++ in the terminal.
 
 !!! tip "Environment variable"
-    Set `OPENJARVIS_MODEL` to change the default model: `OPENJARVIS_MODEL=deepseek-r1:14b ./scripts/quickstart.sh`
+    Set `HOPE_MODEL` to change the default model: `HOPE_MODEL=deepseek-r1:14b ./scripts/quickstart.sh`
 
 ## Initialize Configuration
 
 Start by detecting your hardware and generating a configuration file:
 
 ```bash
-jarvis init
+hope init
 ```
 
-This runs hardware auto-detection (GPU vendor, VRAM, CPU, RAM) and writes a config file to `~/.openjarvis/config.toml` with sensible defaults for your system. It also selects the recommended inference engine.
+This runs hardware auto-detection (GPU vendor, VRAM, CPU, RAM) and writes a config file to `~/.hope/config.toml` with sensible defaults for your system. It also selects the recommended inference engine.
 
 ```
 Detecting hardware...
@@ -151,7 +151,7 @@ Config written successfully.
 To overwrite an existing config:
 
 ```bash
-jarvis init --force
+hope init --force
 ```
 
 See [Configuration](configuration.md) for the full config reference.
@@ -160,37 +160,37 @@ See [Configuration](configuration.md) for the full config reference.
 
 ### Via CLI
 
-The simplest way to interact with OpenJarvis is the `ask` command:
+The simplest way to interact with Hope is the `ask` command:
 
 ```bash
-jarvis ask "What is the capital of France?"
+hope ask "What is the capital of France?"
 ```
 
-OpenJarvis will auto-detect a running engine, select a model using the configured router policy, and return the response.
+Hope will auto-detect a running engine, select a model using the configured router policy, and return the response.
 
 #### CLI Options
 
 | Option | Description | Example |
 |--------|-------------|---------|
-| `-m`, `--model` | Override model selection | `jarvis ask -m qwen3:8b "Hello"` |
-| `-e`, `--engine` | Force a specific engine | `jarvis ask -e ollama "Hello"` |
-| `-t`, `--temperature` | Sampling temperature (default: 0.7) | `jarvis ask -t 0.2 "Hello"` |
-| `--max-tokens` | Max tokens to generate (default: 1024) | `jarvis ask --max-tokens 2048 "Hello"` |
-| `--json` | Output raw JSON result | `jarvis ask --json "Hello"` |
-| `--no-stream` | Disable streaming | `jarvis ask --no-stream "Hello"` |
-| `--no-context` | Disable memory context injection | `jarvis ask --no-context "Hello"` |
-| `-a`, `--agent` | Use an agent | `jarvis ask -a orchestrator "Hello"` |
-| `--tools` | Comma-separated tools | `jarvis ask --tools calculator,think "2+2"` |
-| `--router` | Router policy for model selection | `jarvis ask --router heuristic "Hello"` |
+| `-m`, `--model` | Override model selection | `hope ask -m qwen3:8b "Hello"` |
+| `-e`, `--engine` | Force a specific engine | `hope ask -e ollama "Hello"` |
+| `-t`, `--temperature` | Sampling temperature (default: 0.7) | `hope ask -t 0.2 "Hello"` |
+| `--max-tokens` | Max tokens to generate (default: 1024) | `hope ask --max-tokens 2048 "Hello"` |
+| `--json` | Output raw JSON result | `hope ask --json "Hello"` |
+| `--no-stream` | Disable streaming | `hope ask --no-stream "Hello"` |
+| `--no-context` | Disable memory context injection | `hope ask --no-context "Hello"` |
+| `-a`, `--agent` | Use an agent | `hope ask -a orchestrator "Hello"` |
+| `--tools` | Comma-separated tools | `hope ask --tools calculator,think "2+2"` |
+| `--router` | Router policy for model selection | `hope ask --router heuristic "Hello"` |
 
 ### Via Python SDK
 
-The `Jarvis` class provides a high-level Python interface:
+The `Hope` class provides a high-level Python interface:
 
 ```python
-from openjarvis import Jarvis
+from hope import Hope
 
-j = Jarvis()
+j = Hope()
 response = j.ask("What is the capital of France?")
 print(response)
 j.close()
@@ -209,21 +209,21 @@ print(result["usage"])    # Token usage statistics
 #### SDK Constructor Options
 
 ```python
-# Use default config (auto-detected hardware, ~/.openjarvis/config.toml)
-j = Jarvis()
+# Use default config (auto-detected hardware, ~/.hope/config.toml)
+j = Hope()
 
 # Override the model
-j = Jarvis(model="qwen3:8b")
+j = Hope(model="qwen3:8b")
 
 # Override the engine
-j = Jarvis(engine_key="ollama")
+j = Hope(engine_key="ollama")
 
 # Use a custom config file
-j = Jarvis(config_path="/path/to/config.toml")
+j = Hope(config_path="/path/to/config.toml")
 ```
 
 !!! warning "Always call `close()`"
-    The `Jarvis` instance holds references to telemetry stores and memory backends. Call `j.close()` when you are done to release resources.
+    The `Hope` instance holds references to telemetry stores and memory backends. Call `j.close()` when you are done to release resources.
 
 ## Using Agents with Tools
 
@@ -252,15 +252,15 @@ Agents add multi-turn reasoning and tool-calling capabilities. The `orchestrator
 ### CLI Example
 
 ```bash
-jarvis ask --agent orchestrator --tools calculator,think "What is 137 * 42?"
+hope ask --agent orchestrator --tools calculator,think "What is 137 * 42?"
 ```
 
 ### SDK Example
 
 ```python
-from openjarvis import Jarvis
+from hope import Hope
 
-j = Jarvis()
+j = Hope()
 result = j.ask_full(
     "What is the square root of 144?",
     agent="orchestrator",
@@ -278,24 +278,24 @@ The memory system lets you index documents and inject relevant context into quer
 
 ### Index Documents
 
-Index a file or directory. OpenJarvis chunks the content and stores it in the configured memory backend (SQLite/FTS5 by default).
+Index a file or directory. Hope chunks the content and stores it in the configured memory backend (SQLite/FTS5 by default).
 
 === "CLI"
 
     ```bash
     # Index a directory
-    jarvis memory index ./docs/
+    hope memory index ./docs/
 
     # Index a single file with custom chunk size
-    jarvis memory index ./paper.txt --chunk-size 256 --chunk-overlap 32
+    hope memory index ./paper.txt --chunk-size 256 --chunk-overlap 32
     ```
 
 === "Python SDK"
 
     ```python
-    from openjarvis import Jarvis
+    from hope import Hope
 
-    j = Jarvis()
+    j = Hope()
     result = j.memory.index("./docs/", chunk_size=512, chunk_overlap=64)
     print(f"Indexed {result['chunks']} chunks")
     j.close()
@@ -308,8 +308,8 @@ Query the memory store to find relevant chunks:
 === "CLI"
 
     ```bash
-    jarvis memory search "configuration options"
-    jarvis memory search -k 10 "how to deploy"
+    hope memory search "configuration options"
+    hope memory search -k 10 "how to deploy"
     ```
 
 === "Python SDK"
@@ -325,7 +325,7 @@ Query the memory store to find relevant chunks:
 === "CLI"
 
     ```bash
-    jarvis memory stats
+    hope memory stats
     ```
 
 === "Python SDK"
@@ -337,14 +337,14 @@ Query the memory store to find relevant chunks:
 
 ### Automatic Context Injection
 
-When you have indexed documents, OpenJarvis automatically injects relevant context into your queries. The memory system searches for chunks matching your query and prepends them as system context before sending to the model.
+When you have indexed documents, Hope automatically injects relevant context into your queries. The memory system searches for chunks matching your query and prepends them as system context before sending to the model.
 
 To disable this behavior:
 
 === "CLI"
 
     ```bash
-    jarvis ask --no-context "Hello"
+    hope ask --no-context "Hello"
     ```
 
 === "Python SDK"
@@ -362,7 +362,7 @@ Context injection is controlled by `agent.context_from_memory` in `config.toml`.
 See all models available on running engines:
 
 ```bash
-jarvis model list
+hope model list
 ```
 
 This produces a table showing each model, its engine, parameter count, context length, and VRAM requirements.
@@ -370,21 +370,21 @@ This produces a table showing each model, its engine, parameter count, context l
 ### Get Model Details
 
 ```bash
-jarvis model info qwen3:8b
+hope model info qwen3:8b
 ```
 
 ### Pull a Model (Ollama)
 
 ```bash
-jarvis model pull qwen3:8b
+hope model pull qwen3:8b
 ```
 
 ### SDK Model Listing
 
 ```python
-from openjarvis import Jarvis
+from hope import Hope
 
-j = Jarvis()
+j = Hope()
 models = j.list_models()
 engines = j.list_engines()
 print(f"Models: {models}")
@@ -399,24 +399,24 @@ The benchmarking framework measures inference latency and throughput against you
 === "All benchmarks"
 
     ```bash
-    jarvis bench run
+    hope bench run
     ```
 
 === "Specific benchmark"
 
     ```bash
-    jarvis bench run -b latency
-    jarvis bench run -b throughput
+    hope bench run -b latency
+    hope bench run -b throughput
     ```
 
 === "Custom options"
 
     ```bash
     # 20 samples, JSON output
-    jarvis bench run -n 20 --json
+    hope bench run -n 20 --json
 
     # Specific model and engine, write to file
-    jarvis bench run -m qwen3:8b -e ollama -o results.jsonl
+    hope bench run -m qwen3:8b -e ollama -o results.jsonl
     ```
 
 Example output:
@@ -439,7 +439,7 @@ throughput (10 samples, 0 errors)
 
 ## Starting the API Server
 
-OpenJarvis provides an OpenAI-compatible API server for integration with existing tools and frontends.
+Hope provides an OpenAI-compatible API server for integration with existing tools and frontends.
 
 !!! note "Requires the `server` extra"
     ```bash
@@ -449,13 +449,13 @@ OpenJarvis provides an OpenAI-compatible API server for integration with existin
 ### Start the Server
 
 ```bash
-jarvis serve --port 8000
+hope serve --port 8000
 ```
 
 With custom options:
 
 ```bash
-jarvis serve --host 0.0.0.0 --port 8000 --engine ollama --model qwen3:8b --agent orchestrator
+hope serve --host 0.0.0.0 --port 8000 --engine ollama --model qwen3:8b --agent orchestrator
 ```
 
 ### API Endpoints
@@ -494,23 +494,23 @@ curl http://localhost:8000/v1/chat/completions \
 
 ## Telemetry
 
-OpenJarvis records telemetry for every inference call (timing, tokens, cost). View aggregated statistics:
+Hope records telemetry for every inference call (timing, tokens, cost). View aggregated statistics:
 
 ```bash
-jarvis telemetry stats
+hope telemetry stats
 ```
 
 Export telemetry data:
 
 ```bash
-jarvis telemetry export --format json
-jarvis telemetry export --format csv -o telemetry.csv
+hope telemetry export --format json
+hope telemetry export --format csv -o telemetry.csv
 ```
 
 Clear all telemetry records:
 
 ```bash
-jarvis telemetry clear --yes
+hope telemetry clear --yes
 ```
 
 ## Complete Working Example
@@ -518,10 +518,10 @@ jarvis telemetry clear --yes
 Here is a complete end-to-end session combining multiple features:
 
 ```python
-from openjarvis import Jarvis
+from hope import Hope
 
 # Initialize with defaults (auto-detect hardware and engine)
-j = Jarvis()
+j = Hope()
 
 # 1. Index some documentation
 index_result = j.memory.index("./docs/", chunk_size=512)

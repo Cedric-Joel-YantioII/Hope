@@ -1,13 +1,13 @@
 //! BaseTool trait — interface for all tool implementations.
 
-use openjarvis_core::{ToolResult, ToolSpec};
+use hope_core::{ToolResult, ToolSpec};
 use serde_json::Value;
 
 /// Base trait for all tools.
 pub trait BaseTool: Send + Sync {
     fn tool_id(&self) -> &str;
     fn spec(&self) -> &ToolSpec;
-    fn execute(&self, params: &Value) -> Result<ToolResult, openjarvis_core::OpenJarvisError>;
+    fn execute(&self, params: &Value) -> Result<ToolResult, hope_core::HopeError>;
 
     /// Convert to OpenAI function calling format.
     fn to_openai_function(&self) -> Value {

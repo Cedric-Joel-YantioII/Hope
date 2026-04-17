@@ -8,7 +8,7 @@
 //! module provides the retrieval math and SQLite-backed persistence.
 
 use crate::storage::traits::MemoryBackend;
-use openjarvis_core::{OpenJarvisError, RetrievalResult};
+use hope_core::{HopeError, RetrievalResult};
 use parking_lot::Mutex;
 use rusqlite::Connection;
 use serde_json::Value;
@@ -27,15 +27,15 @@ pub struct ColBERTMemory {
 }
 
 impl ColBERTMemory {
-    pub fn new(db_path: &Path, token_dim: usize) -> Result<Self, OpenJarvisError> {
+    pub fn new(db_path: &Path, token_dim: usize) -> Result<Self, HopeError> {
         if let Some(parent) = db_path.parent() {
             std::fs::create_dir_all(parent).map_err(|e| {
-                OpenJarvisError::Io(std::io::Error::other(e))
+                HopeError::Io(std::io::Error::other(e))
             })?;
         }
 
         let conn = Connection::open(db_path).map_err(|e| {
-            OpenJarvisError::Io(std::io::Error::other(
+            HopeError::Io(std::io::Error::other(
                 e.to_string(),
             ))
         })?;
@@ -52,7 +52,7 @@ impl ColBERTMemory {
             );",
         )
         .map_err(|e| {
-            OpenJarvisError::Io(std::io::Error::other(
+            HopeError::Io(std::io::Error::other(
                 e.to_string(),
             ))
         })?;
@@ -64,11 +64,11 @@ impl ColBERTMemory {
         })
     }
 
-    pub fn in_memory() -> Result<Self, OpenJarvisError> {
+    pub fn in_memory() -> Result<Self, HopeError> {
         Self::new(Path::new(":memory:"), DEFAULT_TOKEN_DIM)
     }
 
-    pub fn with_dim(token_dim: usize) -> Result<Self, OpenJarvisError> {
+    pub fn with_dim(token_dim: usize) -> Result<Self, HopeError> {
         Self::new(Path::new(":memory:"), token_dim)
     }
 
@@ -104,7 +104,7 @@ impl ColBERTMemory {
         source: &str,
         metadata: Option<&Value>,
         token_embeddings: &[Vec<f64>],
-    ) -> Result<String, OpenJarvisError> {
+    ) -> Result<String, HopeError> {
         let doc_id = Uuid::new_v4().to_string();
         let meta_str = metadata
             .map(|m| serde_json::to_string(m).unwrap_or_default())
@@ -119,7 +119,7 @@ impl ColBERTMemory {
             rusqlite::params![doc_id, content, source, meta_str, num_tokens, emb_bytes],
         )
         .map_err(|e| {
-            OpenJarvisError::Io(std::io::Error::other(
+            HopeError::Io(std::io::Error::other(
                 e.to_string(),
             ))
         })?;
@@ -133,7 +133,7 @@ impl ColBERTMemory {
         &self,
         query_token_embeddings: &[Vec<f64>],
         top_k: usize,
-    ) -> Result<Vec<RetrievalResult>, OpenJarvisError> {
+    ) -> Result<Vec<RetrievalResult>, HopeError> {
         let conn = self.conn.lock();
 
         let mut stmt = conn
@@ -142,7 +142,7 @@ impl ColBERTMemory {
                  FROM colbert_documents",
             )
             .map_err(|e| {
-                OpenJarvisError::Io(std::io::Error::other(
+                HopeError::Io(std::io::Error::other(
                     e.to_string(),
                 ))
             })?;
@@ -157,7 +157,7 @@ impl ColBERTMemory {
                 Ok((content, source, meta_str, num_tokens as usize, emb_bytes))
             })
             .map_err(|e| {
-                OpenJarvisError::Io(std::io::Error::other(
+                HopeError::Io(std::io::Error::other(
                     e.to_string(),
                 ))
             })?
@@ -201,7 +201,7 @@ impl MemoryBackend for ColBERTMemory {
         content: &str,
         source: &str,
         metadata: Option<&Value>,
-    ) -> Result<String, OpenJarvisError> {
+    ) -> Result<String, HopeError> {
         let token_embeddings = self.embed_tokens(content);
         self.store_with_token_embeddings(content, source, metadata, &token_embeddings)
     }
@@ -210,7 +210,7 @@ impl MemoryBackend for ColBERTMemory {
         &self,
         query: &str,
         top_k: usize,
-    ) -> Result<Vec<RetrievalResult>, OpenJarvisError> {
+    ) -> Result<Vec<RetrievalResult>, HopeError> {
         let query_token_embeddings = self.embed_tokens(query);
         if query_token_embeddings.is_empty() {
             return Ok(vec![]);
@@ -218,7 +218,7 @@ impl MemoryBackend for ColBERTMemory {
         self.retrieve_by_token_embeddings(&query_token_embeddings, top_k)
     }
 
-    fn delete(&self, doc_id: &str) -> Result<bool, OpenJarvisError> {
+    fn delete(&self, doc_id: &str) -> Result<bool, HopeError> {
         let conn = self.conn.lock();
         let changes = conn
             .execute(
@@ -226,32 +226,32 @@ impl MemoryBackend for ColBERTMemory {
                 rusqlite::params![doc_id],
             )
             .map_err(|e| {
-                OpenJarvisError::Io(std::io::Error::other(
+                HopeError::Io(std::io::Error::other(
                     e.to_string(),
                 ))
             })?;
         Ok(changes > 0)
     }
 
-    fn clear(&self) -> Result<(), OpenJarvisError> {
+    fn clear(&self) -> Result<(), HopeError> {
         let conn = self.conn.lock();
         conn.execute_batch("DELETE FROM colbert_documents")
             .map_err(|e| {
-                OpenJarvisError::Io(std::io::Error::other(
+                HopeError::Io(std::io::Error::other(
                     e.to_string(),
                 ))
             })?;
         Ok(())
     }
 
-    fn count(&self) -> Result<usize, OpenJarvisError> {
+    fn count(&self) -> Result<usize, HopeError> {
         let conn = self.conn.lock();
         let count: i64 = conn
             .query_row("SELECT COUNT(*) FROM colbert_documents", [], |row| {
                 row.get(0)
             })
             .map_err(|e| {
-                OpenJarvisError::Io(std::io::Error::other(
+                HopeError::Io(std::io::Error::other(
                     e.to_string(),
                 ))
             })?;

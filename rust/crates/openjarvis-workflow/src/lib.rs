@@ -1,6 +1,6 @@
-//! OpenJarvis Workflow — DAG-based workflow graph, builder, and execution planner.
+//! Hope Workflow — DAG-based workflow graph, builder, and execution planner.
 //!
-//! Port of `src/openjarvis/workflow/` from Python.
+//! Port of `src/hope/workflow/` from Python.
 //! Provides cycle detection (DFS), topological sort (Kahn's algorithm),
 //! parallel stage grouping, and a fluent builder API.
 

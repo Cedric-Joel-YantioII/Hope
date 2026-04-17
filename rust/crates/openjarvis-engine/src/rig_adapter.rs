@@ -1,7 +1,7 @@
 //! Rig-core model adapter — bridges `InferenceEngine` into rig's `CompletionModel`.
 
 use crate::traits::InferenceEngine;
-use openjarvis_core::{GenerateResult, Message};
+use hope_core::{GenerateResult, Message};
 use rig::completion::message::Message as RigMessage;
 use rig::completion::request::{
     CompletionError, CompletionRequest, CompletionResponse, ToolDefinition,
@@ -55,7 +55,7 @@ impl<E: InferenceEngine> Clone for RigModelAdapter<E> {
     }
 }
 
-/// Convert rig-core messages to openjarvis Messages.
+/// Convert rig-core messages to hope Messages.
 fn rig_request_to_oj_messages(request: &CompletionRequest) -> Vec<Message> {
     let mut messages = Vec::new();
 
@@ -233,7 +233,7 @@ impl<E: InferenceEngine + 'static> rig::completion::request::CompletionModel
 #[cfg(test)]
 mod tests {
     use super::*;
-    use openjarvis_core::Role;
+    use hope_core::Role;
 
     #[test]
     fn test_rig_request_to_oj_messages_basic() {

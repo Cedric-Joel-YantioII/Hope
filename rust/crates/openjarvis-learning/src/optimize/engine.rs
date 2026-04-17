@@ -1,6 +1,6 @@
 //! OptimizationEngine -- orchestrates the optimize loop.
 //!
-//! Rust translation of `src/openjarvis/learning/optimize/optimizer.py`.
+//! Rust translation of `src/hope/learning/optimize/optimizer.py`.
 //!
 //! Ties together the LLM optimizer, trial runner, and persistence store
 //! into a single propose -> evaluate -> analyze -> repeat loop.

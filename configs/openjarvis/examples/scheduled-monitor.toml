@@ -1,5 +1,5 @@
 # Scheduled Monitor — persistent agent that runs on a schedule
-# Copy to ~/.openjarvis/config.toml
+# Copy to ~/.hope/config.toml
 #
 # The operative agent maintains state across runs, making it ideal for:
 # - Daily email/inbox monitoring
@@ -7,10 +7,10 @@
 # - Long-running research projects
 #
 # Setup:
-#   1. Index your data: jarvis memory index ~/Documents/
-#   2. Start the scheduler: jarvis scheduler start
+#   1. Index your data: hope memory index ~/Documents/
+#   2. Start the scheduler: hope scheduler start
 #   3. Create a task:
-#      jarvis scheduler create \
+#      hope scheduler create \
 #        --prompt "Check for new emails about Project X and update your notes" \
 #        --schedule "0 9 * * 1-5" \
 #        --agent operative \

@@ -124,19 +124,19 @@ export function SettingsPage() {
 
   const [memoryStats, setMemoryStats] = useState<{ entries: number; backend: string } | null>(null);
   const [memoryEnabled, setMemoryEnabled] = useState(() => {
-    try { return localStorage.getItem('openjarvis-memory-enabled') !== 'false'; } catch { return true; }
+    try { return localStorage.getItem('hope-memory-enabled') !== 'false'; } catch { return true; }
   });
   const [memoryBackend, setMemoryBackend] = useState(() => {
-    try { return localStorage.getItem('openjarvis-memory-backend') || 'sqlite'; } catch { return 'sqlite'; }
+    try { return localStorage.getItem('hope-memory-backend') || 'sqlite'; } catch { return 'sqlite'; }
   });
   const [memoryTopK, setMemoryTopK] = useState(() => {
-    try { return parseInt(localStorage.getItem('openjarvis-memory-top-k') || '5'); } catch { return 5; }
+    try { return parseInt(localStorage.getItem('hope-memory-top-k') || '5'); } catch { return 5; }
   });
   const [memoryMinScore, setMemoryMinScore] = useState(() => {
-    try { return parseFloat(localStorage.getItem('openjarvis-memory-min-score') || '0.1'); } catch { return 0.1; }
+    try { return parseFloat(localStorage.getItem('hope-memory-min-score') || '0.1'); } catch { return 0.1; }
   });
   const [memoryMaxTokens, setMemoryMaxTokens] = useState(() => {
-    try { return parseInt(localStorage.getItem('openjarvis-memory-max-tokens') || '2048'); } catch { return 2048; }
+    try { return parseInt(localStorage.getItem('hope-memory-max-tokens') || '2048'); } catch { return 2048; }
   });
 
   useEffect(() => {
@@ -155,12 +155,12 @@ export function SettingsPage() {
   };
 
   const handleExport = () => {
-    const data = localStorage.getItem('openjarvis-conversations') || '{}';
+    const data = localStorage.getItem('hope-conversations') || '{}';
     const blob = new Blob([data], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `openjarvis-export-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `hope-export-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -177,7 +177,7 @@ export function SettingsPage() {
         try {
           const data = JSON.parse(ev.target?.result as string);
           if (data.version === 1) {
-            localStorage.setItem('openjarvis-conversations', JSON.stringify(data));
+            localStorage.setItem('hope-conversations', JSON.stringify(data));
             useAppStore.getState().loadConversations();
             showSaved();
           }
@@ -195,7 +195,7 @@ export function SettingsPage() {
       setTimeout(() => setConfirmClear(false), 3000);
       return;
     }
-    localStorage.removeItem('openjarvis-conversations');
+    localStorage.removeItem('hope-conversations');
     useAppStore.getState().loadConversations();
     setConfirmClear(false);
     showSaved();
@@ -226,7 +226,7 @@ export function SettingsPage() {
         <div className="flex flex-col gap-4">
           {/* Appearance */}
           <Section title="Appearance">
-            <SettingRow label="Theme" description="Choose how OpenJarvis looks">
+            <SettingRow label="Theme" description="Choose how Hope looks">
               <div className="flex gap-1 p-0.5 rounded-lg" style={{ background: 'var(--color-bg-secondary)' }}>
                 {themeOptions.map((opt) => {
                   const isActive = settings.theme === opt.value;
@@ -305,10 +305,10 @@ export function SettingsPage() {
             </div>
             <SettingRow label="Cloud providers" description="Green dot means API key is configured">
               <div className="flex flex-wrap gap-3">
-                <CloudProviderStatus label="OpenAI" storageKey="openjarvis-openai-key" />
-                <CloudProviderStatus label="Anthropic" storageKey="openjarvis-anthropic-key" />
-                <CloudProviderStatus label="Google" storageKey="openjarvis-gemini-key" />
-                <CloudProviderStatus label="OpenRouter" storageKey="openjarvis-openrouter-key" />
+                <CloudProviderStatus label="OpenAI" storageKey="hope-openai-key" />
+                <CloudProviderStatus label="Anthropic" storageKey="hope-anthropic-key" />
+                <CloudProviderStatus label="Google" storageKey="hope-gemini-key" />
+                <CloudProviderStatus label="OpenRouter" storageKey="hope-openrouter-key" />
               </div>
             </SettingRow>
           </Section>
@@ -316,23 +316,23 @@ export function SettingsPage() {
           {/* API Keys */}
           <Section title="API Keys">
             <SettingRow label="OpenAI" description="GPT-4, GPT-3.5, etc.">
-              <ApiKeyInput storageKey="openjarvis-openai-key" placeholder="sk-..." />
+              <ApiKeyInput storageKey="hope-openai-key" placeholder="sk-..." />
             </SettingRow>
             <SettingRow label="Anthropic" description="Claude models">
-              <ApiKeyInput storageKey="openjarvis-anthropic-key" placeholder="sk-ant-..." />
+              <ApiKeyInput storageKey="hope-anthropic-key" placeholder="sk-ant-..." />
             </SettingRow>
             <SettingRow label="Google" description="Gemini models">
-              <ApiKeyInput storageKey="openjarvis-gemini-key" placeholder="AI..." />
+              <ApiKeyInput storageKey="hope-gemini-key" placeholder="AI..." />
             </SettingRow>
             <SettingRow label="OpenRouter" description="Multi-provider routing">
-              <ApiKeyInput storageKey="openjarvis-openrouter-key" placeholder="sk-or-..." />
+              <ApiKeyInput storageKey="hope-openrouter-key" placeholder="sk-or-..." />
             </SettingRow>
           </Section>
 
           {/* Tools */}
           <Section title="Tools">
             <SettingRow label="Web Search" description="SerpAPI or Tavily key for web search tool">
-              <ApiKeyInput storageKey="openjarvis-search-key" placeholder="API key..." />
+              <ApiKeyInput storageKey="hope-search-key" placeholder="API key..." />
             </SettingRow>
           </Section>
 
@@ -351,7 +351,7 @@ export function SettingsPage() {
                 onClick={() => {
                   const next = !memoryEnabled;
                   setMemoryEnabled(next);
-                  try { localStorage.setItem('openjarvis-memory-enabled', String(next)); } catch {}
+                  try { localStorage.setItem('hope-memory-enabled', String(next)); } catch {}
                   showSaved();
                 }}
                 className="relative w-11 h-6 rounded-full transition-colors cursor-pointer"
@@ -373,7 +373,7 @@ export function SettingsPage() {
                 value={memoryBackend}
                 onChange={(e) => {
                   setMemoryBackend(e.target.value);
-                  try { localStorage.setItem('openjarvis-memory-backend', e.target.value); } catch {}
+                  try { localStorage.setItem('hope-memory-backend', e.target.value); } catch {}
                   showSaved();
                 }}
                 className="text-sm px-3 py-1.5 rounded-lg outline-none cursor-pointer"
@@ -400,7 +400,7 @@ export function SettingsPage() {
                 onChange={(e) => {
                   const v = parseInt(e.target.value);
                   setMemoryTopK(v);
-                  try { localStorage.setItem('openjarvis-memory-top-k', String(v)); } catch {}
+                  try { localStorage.setItem('hope-memory-top-k', String(v)); } catch {}
                   showSaved();
                 }}
                 className="w-32 cursor-pointer accent-[var(--color-accent)]"
@@ -416,7 +416,7 @@ export function SettingsPage() {
                 onChange={(e) => {
                   const v = parseFloat(e.target.value);
                   setMemoryMinScore(v);
-                  try { localStorage.setItem('openjarvis-memory-min-score', String(v)); } catch {}
+                  try { localStorage.setItem('hope-memory-min-score', String(v)); } catch {}
                   showSaved();
                 }}
                 className="w-32 cursor-pointer accent-[var(--color-accent)]"
@@ -432,7 +432,7 @@ export function SettingsPage() {
                 onChange={(e) => {
                   const v = parseInt(e.target.value);
                   setMemoryMaxTokens(v);
-                  try { localStorage.setItem('openjarvis-memory-max-tokens', String(v)); } catch {}
+                  try { localStorage.setItem('hope-memory-max-tokens', String(v)); } catch {}
                   showSaved();
                 }}
                 className="w-32 cursor-pointer accent-[var(--color-accent)]"
@@ -505,7 +505,7 @@ export function SettingsPage() {
             {!speechBackendAvailable && speechBackendAvailable !== null && (
               <div className="text-xs mt-2 px-1" style={{ color: 'var(--color-text-tertiary)' }}>
                 Set up a speech backend to use voice input.
-                See the <a href="https://open-jarvis.github.io/OpenJarvis/user-guide/tools/" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-accent)' }}>documentation</a> for details.
+                See the <a href="https://open-hope.github.io/Hope/user-guide/tools/" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-accent)' }}>documentation</a> for details.
               </div>
             )}
           </Section>
@@ -555,14 +555,14 @@ export function SettingsPage() {
           <Section title="About">
             <div className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
               <p className="mb-2">
-                <span className="font-semibold" style={{ color: 'var(--color-text)' }}>OpenJarvis</span> — Programming abstractions for on-device AI.
+                <span className="font-semibold" style={{ color: 'var(--color-text)' }}>Hope</span> — Programming abstractions for on-device AI.
               </p>
               <p className="text-xs" style={{ color: 'var(--color-text-tertiary)' }}>
                 Part of Intelligence Per Watt, a research initiative at Stanford SAIL.
               </p>
               <div className="flex gap-3 mt-3 text-xs">
                 <a
-                  href="https://scalingintelligence.stanford.edu/blogs/openjarvis/"
+                  href="https://scalingintelligence.stanford.edu/blogs/hope/"
                   target="_blank"
                   rel="noopener noreferrer"
                   style={{ color: 'var(--color-accent)' }}
@@ -570,7 +570,7 @@ export function SettingsPage() {
                   Project site
                 </a>
                 <a
-                  href="https://open-jarvis.github.io/OpenJarvis/"
+                  href="https://open-hope.github.io/Hope/"
                   target="_blank"
                   rel="noopener noreferrer"
                   style={{ color: 'var(--color-accent)' }}

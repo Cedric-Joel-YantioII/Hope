@@ -4,7 +4,7 @@ use crate::bandit::BanditRouterPolicy;
 use crate::grpo::GRPORouterPolicy;
 use crate::heuristic::HeuristicRouter;
 use crate::traits::RouterPolicy;
-use openjarvis_core::RoutingContext;
+use hope_core::RoutingContext;
 
 /// Closed enum of all supported router policies.
 pub enum RouterPolicyEnum {

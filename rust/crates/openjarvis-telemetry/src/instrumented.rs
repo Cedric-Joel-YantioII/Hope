@@ -1,9 +1,9 @@
 //! InstrumentedEngine — wraps any InferenceEngine with telemetry recording.
 
 use crate::store::TelemetryStore;
-use openjarvis_core::error::OpenJarvisError;
-use openjarvis_core::{GenerateResult, Message, TelemetryRecord};
-use openjarvis_engine::traits::{InferenceEngine, TokenStream};
+use hope_core::error::HopeError;
+use hope_core::{GenerateResult, Message, TelemetryRecord};
+use hope_engine::traits::{InferenceEngine, TokenStream};
 use serde_json::Value;
 use std::sync::Arc;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
@@ -51,7 +51,7 @@ impl<E: InferenceEngine> InferenceEngine for InstrumentedEngine<E> {
         temperature: f64,
         max_tokens: i64,
         extra: Option<&Value>,
-    ) -> Result<GenerateResult, OpenJarvisError> {
+    ) -> Result<GenerateResult, HopeError> {
         let start = Instant::now();
         let result = self
             .inner
@@ -93,13 +93,13 @@ impl<E: InferenceEngine> InferenceEngine for InstrumentedEngine<E> {
         temperature: f64,
         max_tokens: i64,
         extra: Option<&Value>,
-    ) -> Result<TokenStream, OpenJarvisError> {
+    ) -> Result<TokenStream, HopeError> {
         self.inner
             .stream(messages, model, temperature, max_tokens, extra)
             .await
     }
 
-    fn list_models(&self) -> Result<Vec<String>, OpenJarvisError> {
+    fn list_models(&self) -> Result<Vec<String>, HopeError> {
         self.inner.list_models()
     }
 

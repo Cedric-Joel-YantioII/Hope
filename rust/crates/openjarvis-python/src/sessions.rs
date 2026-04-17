@@ -4,7 +4,7 @@ use pyo3::prelude::*;
 
 #[pyclass(name = "SessionStore", unsendable)]
 pub struct PySessionStore {
-    inner: openjarvis_sessions::SessionStore,
+    inner: hope_sessions::SessionStore,
 }
 
 #[pymethods]
@@ -13,7 +13,7 @@ impl PySessionStore {
     #[pyo3(signature = (db_path=":memory:", max_age_hours=24.0, consolidation_threshold=100))]
     fn new(db_path: &str, max_age_hours: f64, consolidation_threshold: usize) -> Self {
         Self {
-            inner: openjarvis_sessions::SessionStore::new(
+            inner: hope_sessions::SessionStore::new(
                 db_path,
                 max_age_hours,
                 consolidation_threshold,

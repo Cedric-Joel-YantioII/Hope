@@ -1,4 +1,4 @@
-//! PyO3 bridge — exposes ~50 Rust classes to Python via `openjarvis_rust`.
+//! PyO3 bridge — exposes ~50 Rust classes to Python via `hope_rust`.
 #![allow(clippy::redundant_closure, unused_variables)]
 
 use once_cell::sync::Lazy;
@@ -33,39 +33,39 @@ pub mod workflow;
 #[pyo3(signature = (path=None))]
 fn load_config(path: Option<&str>) -> PyResult<core::PyConfig> {
     let p = path.map(std::path::Path::new);
-    let config = openjarvis_core::load_config(p)
+    let config = hope_core::load_config(p)
         .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
     Ok(core::PyConfig { inner: config })
 }
 
 #[pyfunction]
 fn detect_hardware() -> PyResult<String> {
-    let hw = openjarvis_core::hardware::detect_hardware();
+    let hw = hope_core::hardware::detect_hardware();
     Ok(serde_json::to_string(&hw).unwrap_or_default())
 }
 
 #[pyfunction]
 fn check_ssrf(url: &str) -> Option<String> {
-    openjarvis_security::check_ssrf(url)
+    hope_security::check_ssrf(url)
 }
 
 #[pyfunction]
 fn is_sensitive_file(path: &str) -> bool {
-    openjarvis_security::is_sensitive_file(std::path::Path::new(path))
+    hope_security::is_sensitive_file(std::path::Path::new(path))
 }
 
 #[pyfunction]
 fn register_builtin_models() {
-    openjarvis_core::model_catalog::register_builtin_models();
+    hope_core::model_catalog::register_builtin_models();
 }
 
 #[pyfunction]
 fn classify_query(query: &str) -> &'static str {
-    openjarvis_learning::classify_query(query)
+    hope_learning::classify_query(query)
 }
 
 #[pymodule]
-fn openjarvis_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
+fn hope_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // --- Core types ---
     m.add_class::<core::PyMessage>()?;
     m.add_class::<core::PyToolResult>()?;

@@ -1,11 +1,11 @@
 <div align="center">
-  <img alt="OpenJarvis" src="assets/OpenJarvis_Horizontal_Logo.png" width="400">
+  <img alt="Hope" src="assets/Hope_Horizontal_Logo.png" width="400">
 
   <p><i>Personal AI, On Personal Devices.</i></p>
 
   <p>
-    <a href="https://scalingintelligence.stanford.edu/blogs/openjarvis/"><img src="https://img.shields.io/badge/project-OpenJarvis-blue" alt="Project"></a>
-    <a href="https://open-jarvis.github.io/OpenJarvis/"><img src="https://img.shields.io/badge/docs-mkdocs-blue" alt="Docs"></a>
+    <a href="https://scalingintelligence.stanford.edu/blogs/hope/"><img src="https://img.shields.io/badge/project-Hope-blue" alt="Project"></a>
+    <a href="https://open-hope.github.io/Hope/"><img src="https://img.shields.io/badge/docs-mkdocs-blue" alt="Docs"></a>
     <img src="https://img.shields.io/badge/python-%3E%3D3.10-blue" alt="Python">
     <img src="https://img.shields.io/badge/license-Apache%202.0-green" alt="License">
     <a href="https://discord.gg/YZZRxCAhmm"><img src="https://img.shields.io/badge/discord-join-7289da?logo=discord&logoColor=white" alt="Discord"></a>
@@ -14,19 +14,19 @@
 
 ---
 
-> **[Documentation](https://open-jarvis.github.io/OpenJarvis/)**
+> **[Documentation](https://open-hope.github.io/Hope/)**
 >
-> **[Project Site](https://scalingintelligence.stanford.edu/blogs/openjarvis/)**
+> **[Project Site](https://scalingintelligence.stanford.edu/blogs/hope/)**
 >
-> **[Leaderboard](https://open-jarvis.github.io/OpenJarvis/leaderboard/)**
+> **[Leaderboard](https://open-hope.github.io/Hope/leaderboard/)**
 >
-> **[Roadmap](https://open-jarvis.github.io/OpenJarvis/development/roadmap/)**
+> **[Roadmap](https://open-hope.github.io/Hope/development/roadmap/)**
 
-## Why OpenJarvis?
+## Why Hope?
 
 Personal AI agents are exploding in popularity, but nearly all of them still route intelligence through cloud APIs. Your "personal" AI continues to depend on someone else's server. At the same time, our [Intelligence Per Watt](https://www.intelligence-per-watt.ai/) research showed that local language models already handle 88.7% of single-turn chat and reasoning queries, with intelligence efficiency improving 5.3× from 2023 to 2025. The models and hardware are increasingly ready. What has been missing is the software stack to make local-first personal AI practical.
 
-OpenJarvis is that stack. It is an opinionated framework for local-first personal AI, built around three core ideas: shared primitives for building on-device agents; evaluations that treat energy, FLOPs, latency, and dollar cost as first-class constraints alongside accuracy; and a learning loop that improves models using local trace data. The goal is simple: make it possible to build personal AI agents that run locally by default, calling the cloud only when truly necessary. OpenJarvis aims to be both a research platform and a production foundation for local AI, in the spirit of PyTorch.
+Hope is that stack. It is an opinionated framework for local-first personal AI, built around three core ideas: shared primitives for building on-device agents; evaluations that treat energy, FLOPs, latency, and dollar cost as first-class constraints alongside accuracy; and a learning loop that improves models using local trace data. The goal is simple: make it possible to build personal AI agents that run locally by default, calling the cloud only when truly necessary. Hope aims to be both a research platform and a production foundation for local AI, in the spirit of PyTorch.
 
 ## Installation
 
@@ -39,18 +39,18 @@ OpenJarvis is that stack. It is an opinionated framework for local-first persona
 | **Rust** | `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \| sh` |
 | **Git** | [git-scm.com](https://git-scm.com/) — or `brew install git` on macOS |
 
-> **macOS users:** see the full [macOS Installation Guide](https://open-jarvis.github.io/OpenJarvis/getting-started/macos/) for a step-by-step walkthrough including Homebrew setup.
+> **macOS users:** see the full [macOS Installation Guide](https://open-hope.github.io/Hope/getting-started/macos/) for a step-by-step walkthrough including Homebrew setup.
 
 ### Setup
 
 ```bash
-git clone https://github.com/open-jarvis/OpenJarvis.git
-cd OpenJarvis
+git clone https://github.com/open-hope/Hope.git
+cd Hope
 uv sync                           # core framework
 uv sync --extra server             # + FastAPI server
 
 # Build the Rust extension
-uv run maturin develop -m rust/crates/openjarvis-python/Cargo.toml
+uv run maturin develop -m rust/crates/hope-python/Cargo.toml
 ```
 
 > **Python 3.14+:** set `PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1` before the `maturin` command.
@@ -61,10 +61,10 @@ You also need a local inference backend: [Ollama](https://ollama.com), [vLLM](ht
 
 ```bash
 # 1. Install and detect hardware
-git clone https://github.com/open-jarvis/OpenJarvis.git
-cd OpenJarvis
+git clone https://github.com/open-hope/Hope.git
+cd Hope
 uv sync
-uv run jarvis init
+uv run hope init
 
 # 2. Start Ollama and pull a model
 curl -fsSL https://ollama.com/install.sh | sh
@@ -72,22 +72,22 @@ ollama serve &
 ollama pull qwen3:8b
 
 # 3. Ask a question
-uv run jarvis ask "What is the capital of France?"
+uv run hope ask "What is the capital of France?"
 ```
 
-`jarvis init` auto-detects your hardware and recommends the best engine. Run `uv run jarvis doctor` at any time to diagnose issues.
+`hope init` auto-detects your hardware and recommends the best engine. Run `uv run hope doctor` at any time to diagnose issues.
 
 ## Starter Configs
 
 Install any preset with one command:
 
 ```bash
-jarvis init --preset morning-digest-mac   # or any preset below
+hope init --preset morning-digest-mac   # or any preset below
 ```
 
 | Preset | Use Case | What it does |
 |--------|----------|-------------|
-| `morning-digest-mac` | Daily Briefing (Mac) | Spoken briefing from email, calendar, health, news with Jarvis voice |
+| `morning-digest-mac` | Daily Briefing (Mac) | Spoken briefing from email, calendar, health, news with Hope voice |
 | `morning-digest-linux` | Daily Briefing (Linux) | Same, with vLLM support for GPU servers |
 | `morning-digest-minimal` | Daily Briefing (minimal) | Just Gmail + Calendar, runs on any machine |
 | `deep-research` | Research Assistant | Multi-hop research across indexed docs with citations |
@@ -97,14 +97,14 @@ jarvis init --preset morning-digest-mac   # or any preset below
 
 ```bash
 # Example: Morning Digest on Mac
-jarvis init --preset morning-digest-mac
-jarvis connect gdrive          # one OAuth flow covers Gmail, Calendar, Tasks
-jarvis digest --fresh           # generate and play your first briefing
+hope init --preset morning-digest-mac
+hope connect gdrive          # one OAuth flow covers Gmail, Calendar, Tasks
+hope digest --fresh           # generate and play your first briefing
 
 # Example: Deep Research
-jarvis init --preset deep-research
-jarvis memory index ./docs/    # index your documents
-jarvis ask "Summarize all emails about Project X"
+hope init --preset deep-research
+hope memory index ./docs/    # index your documents
+hope ask "Summarize all emails about Project X"
 ```
 
 ### Skills
@@ -113,22 +113,22 @@ Skills teach agents how to better use tools and improve their reasoning. Every s
 
 ```bash
 # Install skills from public sources
-jarvis skill install hermes:arxiv
-jarvis skill sync hermes --category research
+hope skill install hermes:arxiv
+hope skill sync hermes --category research
 
 # Use skills with any agent
-jarvis ask "Use the code-explainer skill to explain this Python code: for i in range(5): print(i*2)"
+hope ask "Use the code-explainer skill to explain this Python code: for i in range(5): print(i*2)"
 
 # Optimize skills from your trace history
-jarvis optimize skills --policy dspy
+hope optimize skills --policy dspy
 
 # Benchmark the impact
-jarvis bench skills --max-samples 5 --seeds 42
+hope bench skills --max-samples 5 --seeds 42
 ```
 
 Import from [Hermes Agent](https://github.com/NousResearch/hermes-agent) (~150 skills), [OpenClaw](https://github.com/openclaw/skills) (~13,700 community skills), or any GitHub repo. Skills follow the [agentskills.io](https://agentskills.io/specification) open standard.
 
-See the [Skills User Guide](https://open-jarvis.github.io/OpenJarvis/user-guide/skills/) and [Skills Tutorial](https://open-jarvis.github.io/OpenJarvis/tutorials/skills-workflow/) for details.
+See the [Skills User Guide](https://open-hope.github.io/Hope/user-guide/skills/) and [Skills Tutorial](https://open-hope.github.io/Hope/tutorials/skills-workflow/) for details.
 
 ### Built-in Agents
 
@@ -143,9 +143,9 @@ See the [Skills User Guide](https://open-jarvis.github.io/OpenJarvis/user-guide/
 | `native_openhands` | On-demand | CodeAct — generates and executes Python code |
 | `simple` | On-demand | Single-turn chat, no tools |
 
-See the [User Guide](https://open-jarvis.github.io/OpenJarvis/user-guide/morning-digest/) and [Tutorials](https://open-jarvis.github.io/OpenJarvis/tutorials/) for detailed setup instructions.
+See the [User Guide](https://open-hope.github.io/Hope/user-guide/morning-digest/) and [Tutorials](https://open-hope.github.io/Hope/tutorials/) for detailed setup instructions.
 
-Full documentation — including Docker deployment, cloud engines, development setup, and tutorials — at **[open-jarvis.github.io/OpenJarvis](https://open-jarvis.github.io/OpenJarvis/)**.
+Full documentation — including Docker deployment, cloud engines, development setup, and tutorials — at **[open-hope.github.io/Hope](https://open-hope.github.io/Hope/)**.
 
 ## Contributing
 
@@ -154,18 +154,18 @@ We welcome contributions! See the [Contributing Guide](CONTRIBUTING.md) for ince
 Quick start for contributors:
 
 ```bash
-git clone https://github.com/open-jarvis/OpenJarvis.git
-cd OpenJarvis
+git clone https://github.com/open-hope/Hope.git
+cd Hope
 uv sync --extra dev
 uv run pre-commit install
 uv run pytest tests/ -v
 ```
 
-Browse the [Roadmap](https://open-jarvis.github.io/OpenJarvis/development/roadmap/) for areas where help is needed. Comment **"take"** on any issue to get auto-assigned.
+Browse the [Roadmap](https://open-hope.github.io/Hope/development/roadmap/) for areas where help is needed. Comment **"take"** on any issue to get auto-assigned.
 
 ## About
 
-OpenJarvis is part of [Intelligence Per Watt](https://www.intelligence-per-watt.ai/), a research initiative studying the efficiency of on-device AI systems. The project is developed at [Hazy Research](https://hazyresearch.stanford.edu/) and the [Scaling Intelligence Lab](https://scalingintelligence.stanford.edu/) at [Stanford SAIL](https://ai.stanford.edu/).
+Hope is part of [Intelligence Per Watt](https://www.intelligence-per-watt.ai/), a research initiative studying the efficiency of on-device AI systems. The project is developed at [Hazy Research](https://hazyresearch.stanford.edu/) and the [Scaling Intelligence Lab](https://scalingintelligence.stanford.edu/) at [Stanford SAIL](https://ai.stanford.edu/).
 
 ## Sponsors
 
@@ -181,11 +181,11 @@ OpenJarvis is part of [Intelligence Per Watt](https://www.intelligence-per-watt.
 
 ## Citation
 ```bibtex
-@misc{saadfalcon2026openjarvis,
-  title={OpenJarvis: Personal AI, On Personal Devices},
+@misc{saadfalcon2026hope,
+  title={Hope: Personal AI, On Personal Devices},
   author={Jon Saad-Falcon and Avanika Narayan and Herumb Shandilya and Hakki Orhun Akengin and Robby Manihani and Gabriel Bo and John Hennessy and Christopher R\'{e} and Azalia Mirhoseini},
   year={2026},
-  howpublished={\url{https://scalingintelligence.stanford.edu/blogs/openjarvis/}},
+  howpublished={\url{https://scalingintelligence.stanford.edu/blogs/hope/}},
 }
 ```
 

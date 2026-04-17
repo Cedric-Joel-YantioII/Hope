@@ -1,13 +1,13 @@
 # Deep Research Agent — multi-hop research across your indexed documents
-# Copy to ~/.openjarvis/config.toml
+# Copy to ~/.hope/config.toml
 #
 # First index your documents:
-#   jarvis memory index ./docs/
-#   jarvis memory index ~/Documents/papers/
+#   hope memory index ./docs/
+#   hope memory index ~/Documents/papers/
 #
 # Then ask complex questions:
-#   jarvis ask --agent deep_research "Summarize all emails about Project X"
-#   jarvis ask --agent deep_research "What meetings did I have with Alice last month?"
+#   hope ask --agent deep_research "Summarize all emails about Project X"
+#   hope ask --agent deep_research "What meetings did I have with Alice last month?"
 
 [engine]
 default = "ollama"

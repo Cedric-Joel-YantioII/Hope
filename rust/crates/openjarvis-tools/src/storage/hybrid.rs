@@ -11,7 +11,7 @@
 //! of the document in backend `i`'s result list (or absent if not returned).
 
 use crate::storage::traits::MemoryBackend;
-use openjarvis_core::{OpenJarvisError, RetrievalResult};
+use hope_core::{HopeError, RetrievalResult};
 use std::collections::HashMap;
 
 /// Default RRF smoothing constant.
@@ -84,7 +84,7 @@ impl MemoryBackend for HybridMemory {
         content: &str,
         source: &str,
         metadata: Option<&serde_json::Value>,
-    ) -> Result<String, OpenJarvisError> {
+    ) -> Result<String, HopeError> {
         let mut last_id = String::new();
         for backend in &self.backends {
             last_id = backend.store(content, source, metadata)?;
@@ -96,7 +96,7 @@ impl MemoryBackend for HybridMemory {
         &self,
         query: &str,
         top_k: usize,
-    ) -> Result<Vec<RetrievalResult>, OpenJarvisError> {
+    ) -> Result<Vec<RetrievalResult>, HopeError> {
         // Ask each backend for a generous number of results to give RRF enough data.
         let fetch_k = top_k * 3;
         let mut per_backend: Vec<Vec<RetrievalResult>> = Vec::with_capacity(self.backends.len());
@@ -106,7 +106,7 @@ impl MemoryBackend for HybridMemory {
         Ok(self.fuse_results(per_backend, top_k))
     }
 
-    fn delete(&self, doc_id: &str) -> Result<bool, OpenJarvisError> {
+    fn delete(&self, doc_id: &str) -> Result<bool, HopeError> {
         let mut any_deleted = false;
         for backend in &self.backends {
             if backend.delete(doc_id)? {
@@ -116,14 +116,14 @@ impl MemoryBackend for HybridMemory {
         Ok(any_deleted)
     }
 
-    fn clear(&self) -> Result<(), OpenJarvisError> {
+    fn clear(&self) -> Result<(), HopeError> {
         for backend in &self.backends {
             backend.clear()?;
         }
         Ok(())
     }
 
-    fn count(&self) -> Result<usize, OpenJarvisError> {
+    fn count(&self) -> Result<usize, HopeError> {
         // Return count from the first backend (all should be in sync after store/delete).
         self.backends
             .first()

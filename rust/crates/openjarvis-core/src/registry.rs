@@ -1,6 +1,6 @@
 //! Decorator-based registry for runtime discovery of pluggable components.
 //!
-//! Rust translation of `src/openjarvis/core/registry.py`.
+//! Rust translation of `src/hope/core/registry.py`.
 //! Uses `parking_lot::RwLock` for thread-safe concurrent access.
 
 use crate::error::RegistryError;

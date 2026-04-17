@@ -1,6 +1,6 @@
 //! Search space builder and default search space for configuration optimization.
 //!
-//! Rust translation of `src/openjarvis/learning/optimize/search_space.py`.
+//! Rust translation of `src/hope/learning/optimize/search_space.py`.
 
 use std::collections::HashMap;
 

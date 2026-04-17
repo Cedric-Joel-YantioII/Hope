@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 #[pyclass(name = "TelemetryStore")]
 pub struct PyTelemetryStore {
-    pub inner: Arc<openjarvis_telemetry::TelemetryStore>,
+    pub inner: Arc<hope_telemetry::TelemetryStore>,
 }
 
 #[pymethods]
@@ -14,8 +14,8 @@ impl PyTelemetryStore {
     #[pyo3(signature = (path=None))]
     fn new(path: Option<&str>) -> PyResult<Self> {
         let inner = match path {
-            Some(p) => openjarvis_telemetry::TelemetryStore::new(std::path::Path::new(p)),
-            None => openjarvis_telemetry::TelemetryStore::in_memory(),
+            Some(p) => hope_telemetry::TelemetryStore::new(std::path::Path::new(p)),
+            None => hope_telemetry::TelemetryStore::in_memory(),
         }
         .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
         Ok(Self {
@@ -40,7 +40,7 @@ impl PyTelemetryStore {
 /// The Rust type is a unit struct with a static method.
 #[pyclass(name = "TelemetryAggregator")]
 pub struct PyTelemetryAggregator {
-    store: Arc<openjarvis_telemetry::TelemetryStore>,
+    store: Arc<hope_telemetry::TelemetryStore>,
 }
 
 #[pymethods]
@@ -53,7 +53,7 @@ impl PyTelemetryAggregator {
     }
 
     fn stats(&self) -> PyResult<String> {
-        let stats = openjarvis_telemetry::TelemetryAggregator::stats(&self.store)
+        let stats = hope_telemetry::TelemetryAggregator::stats(&self.store)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
         Ok(serde_json::to_string(&stats).unwrap_or_default())
     }
@@ -61,7 +61,7 @@ impl PyTelemetryAggregator {
 
 #[pyclass(name = "InstrumentedEngine")]
 pub struct PyInstrumentedEngine {
-    inner: openjarvis_telemetry::InstrumentedEngine<openjarvis_engine::Engine>,
+    inner: hope_telemetry::InstrumentedEngine<hope_engine::Engine>,
 }
 
 #[pymethods]
@@ -69,16 +69,16 @@ impl PyInstrumentedEngine {
     #[new]
     #[pyo3(signature = (engine_key="ollama", host="http://localhost:11434", store_path=None, agent_name="default"))]
     fn new(engine_key: &str, host: &str, store_path: Option<&str>, agent_name: &str) -> PyResult<Self> {
-        let config = openjarvis_core::JarvisConfig::default();
-        let engine = openjarvis_engine::get_engine_static(&config, Some(engine_key))
+        let config = hope_core::HopeConfig::default();
+        let engine = hope_engine::get_engine_static(&config, Some(engine_key))
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
         let store = Arc::new(match store_path {
-            Some(p) => openjarvis_telemetry::TelemetryStore::new(std::path::Path::new(p)),
-            None => openjarvis_telemetry::TelemetryStore::in_memory(),
+            Some(p) => hope_telemetry::TelemetryStore::new(std::path::Path::new(p)),
+            None => hope_telemetry::TelemetryStore::in_memory(),
         }
         .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?);
         Ok(Self {
-            inner: openjarvis_telemetry::InstrumentedEngine::new(
+            inner: hope_telemetry::InstrumentedEngine::new(
                 engine,
                 store,
                 agent_name.to_string(),
@@ -87,7 +87,7 @@ impl PyInstrumentedEngine {
     }
 
     fn engine_id(&self) -> &str {
-        use openjarvis_engine::InferenceEngine;
+        use hope_engine::InferenceEngine;
         self.inner.engine_id()
     }
 }
@@ -172,7 +172,7 @@ impl PyTelemetrySample {
 /// Python wrapper for TelemetrySessionCore (ring buffer).
 #[pyclass(name = "TelemetrySessionCore")]
 pub struct PyTelemetrySessionCore {
-    inner: openjarvis_telemetry::session::TelemetrySessionCore,
+    inner: hope_telemetry::session::TelemetrySessionCore,
 }
 
 #[pymethods]
@@ -181,7 +181,7 @@ impl PyTelemetrySessionCore {
     #[pyo3(signature = (capacity=100000, sampling_interval_ms=100))]
     fn new(capacity: usize, sampling_interval_ms: u64) -> Self {
         Self {
-            inner: openjarvis_telemetry::session::TelemetrySessionCore::new(
+            inner: hope_telemetry::session::TelemetrySessionCore::new(
                 capacity,
                 sampling_interval_ms,
             ),
@@ -189,7 +189,7 @@ impl PyTelemetrySessionCore {
     }
 
     fn add_sample(&self, sample: &PyTelemetrySample) {
-        let s = openjarvis_telemetry::session::TelemetrySample {
+        let s = hope_telemetry::session::TelemetrySample {
             timestamp_ns: sample.timestamp_ns,
             gpu_power_w: sample.gpu_power_w,
             cpu_power_w: sample.cpu_power_w,
@@ -249,7 +249,7 @@ impl PyItlStats {
 
     #[staticmethod]
     fn compute(token_timestamps_ms: Vec<f64>) -> PyResult<pyo3::Py<pyo3::types::PyDict>> {
-        let stats = openjarvis_telemetry::itl::compute_itl_stats(&token_timestamps_ms);
+        let stats = hope_telemetry::itl::compute_itl_stats(&token_timestamps_ms);
         pyo3::Python::with_gil(|py| {
             let dict = pyo3::types::PyDict::new(py);
             dict.set_item("p50_ms", stats.p50_ms)?;
@@ -277,13 +277,13 @@ impl PyFlopsEstimator {
 
     #[staticmethod]
     fn estimate_flops(model: &str, input_tokens: u64, output_tokens: u64) -> (f64, f64) {
-        openjarvis_telemetry::flops::estimate_flops(model, input_tokens, output_tokens)
+        hope_telemetry::flops::estimate_flops(model, input_tokens, output_tokens)
     }
 
     #[staticmethod]
     #[pyo3(signature = (flops, duration_s, gpu_name, num_gpus=1))]
     fn compute_mfu(flops: f64, duration_s: f64, gpu_name: &str, num_gpus: u32) -> f64 {
-        openjarvis_telemetry::flops::compute_mfu(flops, duration_s, gpu_name, num_gpus)
+        hope_telemetry::flops::compute_mfu(flops, duration_s, gpu_name, num_gpus)
     }
 }
 
@@ -305,9 +305,9 @@ impl PyPhaseMetrics {
         end_ns: u64,
         tokens: u64,
     ) -> PyResult<pyo3::Py<pyo3::types::PyDict>> {
-        let rust_samples: Vec<openjarvis_telemetry::session::TelemetrySample> = samples
+        let rust_samples: Vec<hope_telemetry::session::TelemetrySample> = samples
             .iter()
-            .map(|s| openjarvis_telemetry::session::TelemetrySample {
+            .map(|s| hope_telemetry::session::TelemetrySample {
                 timestamp_ns: s.timestamp_ns,
                 gpu_power_w: s.gpu_power_w,
                 cpu_power_w: s.cpu_power_w,
@@ -319,7 +319,7 @@ impl PyPhaseMetrics {
             })
             .collect();
         let metrics =
-            openjarvis_telemetry::phase::compute_phase_metrics(&rust_samples, start_ns, end_ns, tokens);
+            hope_telemetry::phase::compute_phase_metrics(&rust_samples, start_ns, end_ns, tokens);
         pyo3::Python::with_gil(|py| {
             let dict = pyo3::types::PyDict::new(py);
             dict.set_item("energy_j", metrics.energy_j)?;
@@ -340,9 +340,9 @@ impl PyPhaseMetrics {
         input_tokens: u64,
         output_tokens: u64,
     ) -> PyResult<(pyo3::Py<pyo3::types::PyDict>, pyo3::Py<pyo3::types::PyDict>)> {
-        let rust_samples: Vec<openjarvis_telemetry::session::TelemetrySample> = samples
+        let rust_samples: Vec<hope_telemetry::session::TelemetrySample> = samples
             .iter()
-            .map(|s| openjarvis_telemetry::session::TelemetrySample {
+            .map(|s| hope_telemetry::session::TelemetrySample {
                 timestamp_ns: s.timestamp_ns,
                 gpu_power_w: s.gpu_power_w,
                 cpu_power_w: s.cpu_power_w,
@@ -353,7 +353,7 @@ impl PyPhaseMetrics {
                 gpu_mem_gb: s.gpu_mem_gb,
             })
             .collect();
-        let (prefill, decode) = openjarvis_telemetry::phase::split_at_ttft(
+        let (prefill, decode) = hope_telemetry::phase::split_at_ttft(
             &rust_samples,
             start_ns,
             ttft_ns,

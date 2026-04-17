@@ -1,10 +1,10 @@
 # Code Assistant — agent with code execution, file I/O, and shell access
-# Copy to ~/.openjarvis/config.toml
+# Copy to ~/.hope/config.toml
 #
 # Usage:
-#   jarvis ask "Write a Python script that parses CSV files"
-#   jarvis ask "Read main.py and explain the architecture"
-#   jarvis ask --agent orchestrator "Find and fix the bug in test_utils.py"
+#   hope ask "Write a Python script that parses CSV files"
+#   hope ask "Read main.py and explain the architecture"
+#   hope ask --agent orchestrator "Find and fix the bug in test_utils.py"
 
 [engine]
 default = "ollama"

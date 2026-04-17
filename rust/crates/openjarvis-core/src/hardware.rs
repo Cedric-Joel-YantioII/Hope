@@ -1,6 +1,6 @@
 //! Hardware detection and engine recommendation.
 //!
-//! Rust translation of the hardware detection in `src/openjarvis/core/config.py`.
+//! Rust translation of the hardware detection in `src/hope/core/config.py`.
 
 use serde::{Deserialize, Serialize};
 use std::process::Command;

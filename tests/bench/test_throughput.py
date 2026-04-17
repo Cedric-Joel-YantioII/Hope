@@ -6,14 +6,14 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from openjarvis.bench.throughput import ThroughputBenchmark
-from openjarvis.core.registry import BenchmarkRegistry
+from hope.bench.throughput import ThroughputBenchmark
+from hope.core.registry import BenchmarkRegistry
 
 
 @pytest.fixture(autouse=True)
 def _register_throughput():
     """Re-register throughput benchmark after registry clear."""
-    from openjarvis.bench.throughput import ensure_registered
+    from hope.bench.throughput import ensure_registered
 
     ensure_registered()
 

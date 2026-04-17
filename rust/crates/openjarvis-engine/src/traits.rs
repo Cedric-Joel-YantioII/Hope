@@ -1,11 +1,11 @@
 //! InferenceEngine trait and shared utilities.
 
-use openjarvis_core::{GenerateResult, Message, Role};
+use hope_core::{GenerateResult, Message, Role};
 use serde_json::Value;
 use std::pin::Pin;
 use tokio_stream::Stream;
 
-pub type StreamItem = Result<String, openjarvis_core::OpenJarvisError>;
+pub type StreamItem = Result<String, hope_core::HopeError>;
 pub type TokenStream = Pin<Box<dyn Stream<Item = StreamItem> + Send>>;
 
 /// ABC for all inference engine backends.
@@ -22,7 +22,7 @@ pub trait InferenceEngine: Send + Sync {
         temperature: f64,
         max_tokens: i64,
         extra: Option<&Value>,
-    ) -> Result<GenerateResult, openjarvis_core::OpenJarvisError>;
+    ) -> Result<GenerateResult, hope_core::HopeError>;
 
     async fn stream(
         &self,
@@ -31,9 +31,9 @@ pub trait InferenceEngine: Send + Sync {
         temperature: f64,
         max_tokens: i64,
         extra: Option<&Value>,
-    ) -> Result<TokenStream, openjarvis_core::OpenJarvisError>;
+    ) -> Result<TokenStream, hope_core::HopeError>;
 
-    fn list_models(&self) -> Result<Vec<String>, openjarvis_core::OpenJarvisError>;
+    fn list_models(&self) -> Result<Vec<String>, hope_core::HopeError>;
 
     fn health(&self) -> bool;
 
@@ -86,7 +86,7 @@ pub fn messages_to_dicts(messages: &[Message]) -> Vec<Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use openjarvis_core::{Message, ToolCall};
+    use hope_core::{Message, ToolCall};
 
     #[test]
     fn test_messages_to_dicts_basic() {

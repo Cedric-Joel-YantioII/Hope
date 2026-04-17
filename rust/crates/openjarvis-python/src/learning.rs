@@ -1,11 +1,11 @@
 //! PyO3 bindings for learning/router policy types and optimization.
 
-use openjarvis_learning::RouterPolicy;
+use hope_learning::RouterPolicy;
 use pyo3::prelude::*;
 
 #[pyclass(name = "HeuristicRouter")]
 pub struct PyHeuristicRouter {
-    inner: openjarvis_learning::HeuristicRouter,
+    inner: hope_learning::HeuristicRouter,
 }
 
 #[pymethods]
@@ -19,7 +19,7 @@ impl PyHeuristicRouter {
         fast_model: Option<String>,
     ) -> Self {
         Self {
-            inner: openjarvis_learning::HeuristicRouter::new(
+            inner: hope_learning::HeuristicRouter::new(
                 default_model.to_string(),
                 code_model,
                 math_model,
@@ -29,7 +29,7 @@ impl PyHeuristicRouter {
     }
 
     fn select_model(&self, query: &str, has_code: bool, has_math: bool) -> String {
-        let ctx = openjarvis_core::RoutingContext {
+        let ctx = hope_core::RoutingContext {
             query: query.to_string(),
             query_length: query.len(),
             has_code,
@@ -42,7 +42,7 @@ impl PyHeuristicRouter {
 
 #[pyclass(name = "BanditRouterPolicy")]
 pub struct PyBanditRouterPolicy {
-    inner: openjarvis_learning::BanditRouterPolicy,
+    inner: hope_learning::BanditRouterPolicy,
 }
 
 #[pymethods]
@@ -51,16 +51,16 @@ impl PyBanditRouterPolicy {
     #[pyo3(signature = (models, strategy="thompson"))]
     fn new(models: Vec<String>, strategy: &str) -> Self {
         let strat = match strategy {
-            "ucb1" | "UCB1" => openjarvis_learning::bandit::BanditStrategy::UCB1,
-            _ => openjarvis_learning::bandit::BanditStrategy::ThompsonSampling,
+            "ucb1" | "UCB1" => hope_learning::bandit::BanditStrategy::UCB1,
+            _ => hope_learning::bandit::BanditStrategy::ThompsonSampling,
         };
         Self {
-            inner: openjarvis_learning::BanditRouterPolicy::new(models, strat),
+            inner: hope_learning::BanditRouterPolicy::new(models, strat),
         }
     }
 
     fn select_model(&self) -> String {
-        let ctx = openjarvis_core::RoutingContext::default();
+        let ctx = hope_core::RoutingContext::default();
         self.inner.select_model(&ctx)
     }
 
@@ -71,7 +71,7 @@ impl PyBanditRouterPolicy {
 
 #[pyclass(name = "GRPORouterPolicy")]
 pub struct PyGRPORouterPolicy {
-    inner: openjarvis_learning::GRPORouterPolicy,
+    inner: hope_learning::GRPORouterPolicy,
 }
 
 #[pymethods]
@@ -80,12 +80,12 @@ impl PyGRPORouterPolicy {
     #[pyo3(signature = (models, temperature=1.0))]
     fn new(models: Vec<String>, temperature: f64) -> Self {
         Self {
-            inner: openjarvis_learning::GRPORouterPolicy::new(models, temperature),
+            inner: hope_learning::GRPORouterPolicy::new(models, temperature),
         }
     }
 
     fn select_model(&self) -> String {
-        let ctx = openjarvis_core::RoutingContext::default();
+        let ctx = hope_core::RoutingContext::default();
         self.inner.select_model(&ctx)
     }
 
@@ -103,7 +103,7 @@ impl PyGRPORouterPolicy {
 
 #[pyclass(name = "OptimizationStore")]
 pub struct PyOptimizationStore {
-    inner: parking_lot::Mutex<openjarvis_learning::optimize::OptimizationStore>,
+    inner: parking_lot::Mutex<hope_learning::optimize::OptimizationStore>,
 }
 
 #[pymethods]
@@ -114,9 +114,9 @@ impl PyOptimizationStore {
     #[pyo3(signature = (path=":memory:"))]
     fn new(path: &str) -> PyResult<Self> {
         let store = if path == ":memory:" {
-            openjarvis_learning::optimize::OptimizationStore::in_memory()
+            hope_learning::optimize::OptimizationStore::in_memory()
         } else {
-            openjarvis_learning::optimize::OptimizationStore::open(path)
+            hope_learning::optimize::OptimizationStore::open(path)
         };
         let store =
             store.map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
@@ -127,7 +127,7 @@ impl PyOptimizationStore {
 
     /// Save a trial result (JSON string) for a given run_id.
     fn save_trial(&self, run_id: &str, trial_json: &str) -> PyResult<()> {
-        let trial: openjarvis_learning::optimize::TrialResult =
+        let trial: hope_learning::optimize::TrialResult =
             serde_json::from_str(trial_json)
                 .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
         self.inner
@@ -185,7 +185,7 @@ impl PyOptimizationStore {
 
 #[pyclass(name = "LLMOptimizer")]
 pub struct PyLLMOptimizer {
-    inner: openjarvis_learning::optimize::LLMOptimizer,
+    inner: hope_learning::optimize::LLMOptimizer,
 }
 
 #[pymethods]
@@ -197,10 +197,10 @@ impl PyLLMOptimizer {
     #[new]
     #[pyo3(signature = (search_space_json, optimizer_model="gpt-4o"))]
     fn new(search_space_json: &str, optimizer_model: &str) -> PyResult<Self> {
-        let search_space: openjarvis_learning::optimize::SearchSpace =
+        let search_space: hope_learning::optimize::SearchSpace =
             serde_json::from_str(search_space_json)
                 .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
-        let inner = openjarvis_learning::optimize::LLMOptimizer::new(
+        let inner = hope_learning::optimize::LLMOptimizer::new(
             search_space,
             optimizer_model.to_string(),
         );
@@ -216,7 +216,7 @@ impl PyLLMOptimizer {
     /// Propose the next configuration based on trial history (JSON string).
     /// Returns JSON string.
     fn propose_next(&self, history_json: &str) -> PyResult<String> {
-        let history: Vec<openjarvis_learning::optimize::TrialResult> =
+        let history: Vec<hope_learning::optimize::TrialResult> =
             serde_json::from_str(history_json)
                 .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
         let config = self.inner.propose_next(&history);
@@ -228,7 +228,7 @@ impl PyLLMOptimizer {
 
 #[pyclass(name = "SFTRouterPolicy")]
 pub struct PySFTRouterPolicy {
-    inner: openjarvis_learning::SFTRouterPolicy,
+    inner: hope_learning::SFTRouterPolicy,
 }
 
 #[pymethods]
@@ -237,7 +237,7 @@ impl PySFTRouterPolicy {
     #[pyo3(signature = (min_samples=5))]
     fn new(min_samples: usize) -> Self {
         Self {
-            inner: openjarvis_learning::SFTRouterPolicy::new(min_samples),
+            inner: hope_learning::SFTRouterPolicy::new(min_samples),
         }
     }
 
@@ -247,7 +247,7 @@ impl PySFTRouterPolicy {
 
     #[staticmethod]
     fn classify_query(query: &str) -> &'static str {
-        openjarvis_learning::SFTRouterPolicy::classify_query(query)
+        hope_learning::SFTRouterPolicy::classify_query(query)
     }
 
     fn update_from_data(&self, traces_json: &str) -> PyResult<String> {
@@ -263,7 +263,7 @@ impl PySFTRouterPolicy {
 
 #[pyclass(name = "HeuristicRewardFunction")]
 pub struct PyHeuristicRewardFunction {
-    inner: openjarvis_learning::HeuristicRewardFunction,
+    inner: hope_learning::HeuristicRewardFunction,
 }
 
 #[pymethods]
@@ -278,7 +278,7 @@ impl PyHeuristicRewardFunction {
         max_cost: f64,
     ) -> Self {
         Self {
-            inner: openjarvis_learning::HeuristicRewardFunction::new(
+            inner: hope_learning::HeuristicRewardFunction::new(
                 weight_latency,
                 weight_cost,
                 weight_efficiency,
@@ -304,7 +304,7 @@ impl PyHeuristicRewardFunction {
 
 #[pyclass(name = "SkillDiscovery")]
 pub struct PySkillDiscovery {
-    inner: openjarvis_learning::SkillDiscovery,
+    inner: hope_learning::SkillDiscovery,
 }
 
 #[pymethods]
@@ -318,7 +318,7 @@ impl PySkillDiscovery {
         min_outcome: f64,
     ) -> Self {
         Self {
-            inner: openjarvis_learning::SkillDiscovery::new(
+            inner: hope_learning::SkillDiscovery::new(
                 min_frequency,
                 min_sequence_length,
                 max_sequence_length,
@@ -339,7 +339,7 @@ impl PySkillDiscovery {
 
 #[pyclass(name = "TraceDrivenPolicy")]
 pub struct PyTraceDrivenPolicy {
-    inner: openjarvis_learning::TraceDrivenPolicy,
+    inner: hope_learning::TraceDrivenPolicy,
 }
 
 #[pymethods]
@@ -348,7 +348,7 @@ impl PyTraceDrivenPolicy {
     #[pyo3(signature = (available_models=vec![], default_model="", fallback_model=""))]
     fn new(available_models: Vec<String>, default_model: &str, fallback_model: &str) -> Self {
         Self {
-            inner: openjarvis_learning::TraceDrivenPolicy::new(
+            inner: hope_learning::TraceDrivenPolicy::new(
                 available_models,
                 default_model.to_string(),
                 fallback_model.to_string(),
@@ -375,7 +375,7 @@ impl PyTraceDrivenPolicy {
 
 #[pyclass(name = "AgentAdvisorPolicy")]
 pub struct PyAgentAdvisorPolicy {
-    inner: openjarvis_learning::AgentAdvisorPolicy,
+    inner: hope_learning::AgentAdvisorPolicy,
 }
 
 #[pymethods]
@@ -384,12 +384,12 @@ impl PyAgentAdvisorPolicy {
     #[pyo3(signature = (max_traces=50))]
     fn new(max_traces: usize) -> Self {
         Self {
-            inner: openjarvis_learning::AgentAdvisorPolicy::new(max_traces),
+            inner: hope_learning::AgentAdvisorPolicy::new(max_traces),
         }
     }
 
     fn analyze_patterns(&self, traces_json: &str) -> PyResult<String> {
-        let traces: Vec<openjarvis_learning::TraceInfo> = serde_json::from_str(traces_json)
+        let traces: Vec<hope_learning::TraceInfo> = serde_json::from_str(traces_json)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
         let recs = self.inner.analyze_patterns(&traces);
         Ok(serde_json::to_string(&recs).unwrap_or_default())
@@ -397,7 +397,7 @@ impl PyAgentAdvisorPolicy {
 
     #[staticmethod]
     fn classify(query: &str) -> &'static str {
-        openjarvis_learning::AgentAdvisorPolicy::classify(query)
+        hope_learning::AgentAdvisorPolicy::classify(query)
     }
 }
 
@@ -405,7 +405,7 @@ impl PyAgentAdvisorPolicy {
 
 #[pyclass(name = "ICLUpdaterPolicy")]
 pub struct PyICLUpdaterPolicy {
-    inner: openjarvis_learning::ICLUpdaterPolicy,
+    inner: hope_learning::ICLUpdaterPolicy,
 }
 
 #[pymethods]
@@ -414,7 +414,7 @@ impl PyICLUpdaterPolicy {
     #[pyo3(signature = (min_score=0.7, max_examples=20, min_skill_occurrences=3))]
     fn new(min_score: f64, max_examples: usize, min_skill_occurrences: usize) -> Self {
         Self {
-            inner: openjarvis_learning::ICLUpdaterPolicy::new(
+            inner: hope_learning::ICLUpdaterPolicy::new(
                 min_score,
                 max_examples,
                 min_skill_occurrences,
@@ -449,7 +449,7 @@ impl PyICLUpdaterPolicy {
 
 #[pyclass(name = "TrainingDataMiner")]
 pub struct PyTrainingDataMiner {
-    inner: openjarvis_learning::TrainingDataMiner,
+    inner: hope_learning::TrainingDataMiner,
 }
 
 #[pymethods]
@@ -458,19 +458,19 @@ impl PyTrainingDataMiner {
     #[pyo3(signature = (min_quality=0.7, min_samples_per_class=1))]
     fn new(min_quality: f64, min_samples_per_class: usize) -> Self {
         Self {
-            inner: openjarvis_learning::TrainingDataMiner::new(min_quality, min_samples_per_class),
+            inner: hope_learning::TrainingDataMiner::new(min_quality, min_samples_per_class),
         }
     }
 
     fn extract_sft_pairs(&self, traces_json: &str) -> PyResult<String> {
-        let traces: Vec<openjarvis_learning::MinerTraceData> = serde_json::from_str(traces_json)
+        let traces: Vec<hope_learning::MinerTraceData> = serde_json::from_str(traces_json)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
         let pairs = self.inner.extract_sft_pairs(&traces);
         Ok(serde_json::to_string(&pairs).unwrap_or_default())
     }
 
     fn extract_routing_pairs(&self, traces_json: &str) -> PyResult<String> {
-        let traces: Vec<openjarvis_learning::MinerTraceData> = serde_json::from_str(traces_json)
+        let traces: Vec<hope_learning::MinerTraceData> = serde_json::from_str(traces_json)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
         let pairs = self.inner.extract_routing_pairs(&traces);
         Ok(serde_json::to_string(&pairs).unwrap_or_default())
@@ -481,7 +481,7 @@ impl PyTrainingDataMiner {
 
 #[pyclass(name = "AgentConfigEvolver")]
 pub struct PyAgentConfigEvolver {
-    inner: openjarvis_learning::AgentConfigEvolver,
+    inner: hope_learning::AgentConfigEvolver,
 }
 
 #[pymethods]
@@ -490,12 +490,12 @@ impl PyAgentConfigEvolver {
     #[pyo3(signature = (min_quality=0.5))]
     fn new(min_quality: f64) -> Self {
         Self {
-            inner: openjarvis_learning::AgentConfigEvolver::new(min_quality),
+            inner: hope_learning::AgentConfigEvolver::new(min_quality),
         }
     }
 
     fn analyze(&self, traces_json: &str) -> PyResult<String> {
-        let traces: Vec<openjarvis_learning::EvolutionTraceData> =
+        let traces: Vec<hope_learning::EvolutionTraceData> =
             serde_json::from_str(traces_json)
                 .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
         let recs = self.inner.analyze(&traces);
@@ -507,7 +507,7 @@ impl PyAgentConfigEvolver {
 
 #[pyclass(name = "MultiObjectiveReward")]
 pub struct PyMultiObjectiveReward {
-    inner: openjarvis_learning::MultiObjectiveReward,
+    inner: hope_learning::MultiObjectiveReward,
 }
 
 #[pymethods]
@@ -515,15 +515,15 @@ impl PyMultiObjectiveReward {
     #[new]
     fn new() -> Self {
         Self {
-            inner: openjarvis_learning::MultiObjectiveReward::new(
-                openjarvis_learning::RewardWeights::default(),
-                openjarvis_learning::Normalizers::default(),
+            inner: hope_learning::MultiObjectiveReward::new(
+                hope_learning::RewardWeights::default(),
+                hope_learning::Normalizers::default(),
             ),
         }
     }
 
     fn compute(&self, episode_json: &str) -> PyResult<f64> {
-        let ep: openjarvis_learning::Episode = serde_json::from_str(episode_json)
+        let ep: hope_learning::Episode = serde_json::from_str(episode_json)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
         Ok(self.inner.compute(&ep))
     }
@@ -533,7 +533,7 @@ impl PyMultiObjectiveReward {
 
 #[pyclass(name = "LearningOrchestrator")]
 pub struct PyLearningOrchestrator {
-    inner: openjarvis_learning::LearningOrchestrator,
+    inner: hope_learning::LearningOrchestrator,
 }
 
 #[pymethods]
@@ -542,7 +542,7 @@ impl PyLearningOrchestrator {
     #[pyo3(signature = (min_improvement=0.02, min_sft_pairs=10, min_quality=0.7))]
     fn new(min_improvement: f64, min_sft_pairs: usize, min_quality: f64) -> Self {
         Self {
-            inner: openjarvis_learning::LearningOrchestrator::new(
+            inner: hope_learning::LearningOrchestrator::new(
                 min_improvement,
                 min_sft_pairs,
                 min_quality,

@@ -7,14 +7,14 @@ from pathlib import Path
 
 import pytest
 
-from openjarvis.core.types import TelemetryRecord
-from openjarvis.telemetry.aggregator import (
+from hope.core.types import TelemetryRecord
+from hope.telemetry.aggregator import (
     AggregatedStats,
     EngineStats,
     ModelStats,
     TelemetryAggregator,
 )
-from openjarvis.telemetry.store import TelemetryStore
+from hope.telemetry.store import TelemetryStore
 
 
 def _make_record(

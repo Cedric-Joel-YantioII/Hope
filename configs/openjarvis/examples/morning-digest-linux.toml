@@ -1,5 +1,5 @@
 # Morning Digest — Linux / Cloud GPU with Ollama or vLLM
-# Copy to ~/.openjarvis/config.toml and customize
+# Copy to ~/.hope/config.toml and customize
 #
 # Requirements:
 #   - Ollama or vLLM running locally
@@ -30,7 +30,7 @@ enabled = ["code_interpreter", "web_search", "file_read", "shell_exec", "digest_
 enabled = true
 schedule = "0 7 * * *"
 timezone = "America/New_York"      # Change to your timezone
-persona = "jarvis"
+persona = "hope"
 honorific = "sir"
 tts_backend = "openai"             # OpenAI TTS works everywhere
 voice_id = "onyx"                  # Deep male voice

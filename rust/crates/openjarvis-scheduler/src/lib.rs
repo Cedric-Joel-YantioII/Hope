@@ -1,4 +1,4 @@
-//! OpenJarvis Scheduler — task scheduling with cron, interval, and one-shot
+//! Hope Scheduler — task scheduling with cron, interval, and one-shot
 //! triggers backed by SQLite persistence.
 
 use chrono::{Datelike, Timelike};

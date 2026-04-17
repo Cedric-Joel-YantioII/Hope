@@ -1,6 +1,6 @@
 //! TelemetryStore — SQLite persistence for telemetry records.
 
-use openjarvis_core::{OpenJarvisError, TelemetryRecord};
+use hope_core::{HopeError, TelemetryRecord};
 use parking_lot::Mutex;
 use rusqlite::Connection;
 use std::path::{Path, PathBuf};
@@ -11,15 +11,15 @@ pub struct TelemetryStore {
 }
 
 impl TelemetryStore {
-    pub fn new(db_path: &Path) -> Result<Self, OpenJarvisError> {
+    pub fn new(db_path: &Path) -> Result<Self, HopeError> {
         if let Some(parent) = db_path.parent() {
             std::fs::create_dir_all(parent).map_err(|e| {
-                OpenJarvisError::Io(std::io::Error::other(e))
+                HopeError::Io(std::io::Error::other(e))
             })?;
         }
 
         let conn = Connection::open(db_path).map_err(|e| {
-            OpenJarvisError::Io(std::io::Error::other(
+            HopeError::Io(std::io::Error::other(
                 e.to_string(),
             ))
         })?;
@@ -50,7 +50,7 @@ impl TelemetryStore {
             )",
         )
         .map_err(|e| {
-            OpenJarvisError::Io(std::io::Error::other(
+            HopeError::Io(std::io::Error::other(
                 e.to_string(),
             ))
         })?;
@@ -61,11 +61,11 @@ impl TelemetryStore {
         })
     }
 
-    pub fn in_memory() -> Result<Self, OpenJarvisError> {
+    pub fn in_memory() -> Result<Self, HopeError> {
         Self::new(Path::new(":memory:"))
     }
 
-    pub fn record(&self, rec: &TelemetryRecord) -> Result<(), OpenJarvisError> {
+    pub fn record(&self, rec: &TelemetryRecord) -> Result<(), HopeError> {
         let metadata_json = serde_json::to_string(&rec.metadata).unwrap_or_default();
         let conn = self.conn.lock();
         conn.execute(
@@ -100,29 +100,29 @@ impl TelemetryStore {
             ],
         )
         .map_err(|e| {
-            OpenJarvisError::Io(std::io::Error::other(
+            HopeError::Io(std::io::Error::other(
                 e.to_string(),
             ))
         })?;
         Ok(())
     }
 
-    pub fn count(&self) -> Result<usize, OpenJarvisError> {
+    pub fn count(&self) -> Result<usize, HopeError> {
         let conn = self.conn.lock();
         let count: i64 = conn
             .query_row("SELECT COUNT(*) FROM telemetry", [], |row| row.get(0))
             .map_err(|e| {
-                OpenJarvisError::Io(std::io::Error::other(
+                HopeError::Io(std::io::Error::other(
                     e.to_string(),
                 ))
             })?;
         Ok(count as usize)
     }
 
-    pub fn clear(&self) -> Result<(), OpenJarvisError> {
+    pub fn clear(&self) -> Result<(), HopeError> {
         let conn = self.conn.lock();
         conn.execute("DELETE FROM telemetry", []).map_err(|e| {
-            OpenJarvisError::Io(std::io::Error::other(
+            HopeError::Io(std::io::Error::other(
                 e.to_string(),
             ))
         })?;

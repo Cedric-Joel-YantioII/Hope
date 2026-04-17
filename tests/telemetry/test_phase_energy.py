@@ -8,11 +8,11 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from openjarvis.core.events import EventBus, EventType
-from openjarvis.core.types import Message, Role, TelemetryRecord
-from openjarvis.telemetry.aggregator import TelemetryAggregator
-from openjarvis.telemetry.instrumented_engine import InstrumentedEngine
-from openjarvis.telemetry.store import TelemetryStore
+from hope.core.events import EventBus, EventType
+from hope.core.types import Message, Role, TelemetryRecord
+from hope.telemetry.aggregator import TelemetryAggregator
+from hope.telemetry.instrumented_engine import InstrumentedEngine
+from hope.telemetry.store import TelemetryStore
 
 # ---------------------------------------------------------------------------
 # Helpers

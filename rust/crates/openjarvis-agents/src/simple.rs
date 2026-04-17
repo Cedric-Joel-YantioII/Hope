@@ -4,7 +4,7 @@
 
 use crate::traits::OjAgent;
 use crate::utils::strip_think_tags;
-use openjarvis_core::{AgentContext, AgentResult, OpenJarvisError};
+use hope_core::{AgentContext, AgentResult, HopeError};
 use rig::agent::AgentBuilder;
 use rig::completion::request::{Chat, CompletionModel};
 use std::collections::HashMap;
@@ -38,17 +38,17 @@ impl<M: CompletionModel + 'static> OjAgent for SimpleAgent<M> {
         &self,
         input: &str,
         context: Option<&AgentContext>,
-    ) -> Result<AgentResult, OpenJarvisError> {
+    ) -> Result<AgentResult, HopeError> {
         let history: Vec<rig::completion::message::Message> = context
             .map(|ctx| {
                 ctx.conversation
                     .messages
                     .iter()
                     .filter_map(|m| match m.role {
-                        openjarvis_core::Role::User => {
+                        hope_core::Role::User => {
                             Some(rig::completion::message::Message::user(&m.content))
                         }
-                        openjarvis_core::Role::Assistant => {
+                        hope_core::Role::Assistant => {
                             Some(rig::completion::message::Message::assistant(&m.content))
                         }
                         _ => None,
@@ -62,7 +62,7 @@ impl<M: CompletionModel + 'static> OjAgent for SimpleAgent<M> {
             .chat(input, history)
             .await
             .map_err(|e| {
-                OpenJarvisError::Agent(openjarvis_core::error::AgentError::Execution(
+                HopeError::Agent(hope_core::error::AgentError::Execution(
                     e.to_string(),
                 ))
             })?;

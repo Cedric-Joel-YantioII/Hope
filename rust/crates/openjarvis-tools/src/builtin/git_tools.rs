@@ -1,7 +1,7 @@
 //! Git tools — status, diff, log.
 
 use crate::traits::BaseTool;
-use openjarvis_core::{OpenJarvisError, ToolResult, ToolSpec};
+use hope_core::{HopeError, ToolResult, ToolSpec};
 use once_cell::sync::Lazy;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -55,7 +55,7 @@ pub struct GitStatusTool;
 impl BaseTool for GitStatusTool {
     fn tool_id(&self) -> &str { "git_status" }
     fn spec(&self) -> &ToolSpec { &GIT_STATUS_SPEC }
-    fn execute(&self, params: &Value) -> Result<ToolResult, OpenJarvisError> {
+    fn execute(&self, params: &Value) -> Result<ToolResult, HopeError> {
         let cwd = params["cwd"].as_str();
         match run_git(&["status", "--short"], cwd) {
             Ok(output) => Ok(ToolResult::success("git_status", output)),
@@ -68,7 +68,7 @@ pub struct GitDiffTool;
 impl BaseTool for GitDiffTool {
     fn tool_id(&self) -> &str { "git_diff" }
     fn spec(&self) -> &ToolSpec { &GIT_DIFF_SPEC }
-    fn execute(&self, params: &Value) -> Result<ToolResult, OpenJarvisError> {
+    fn execute(&self, params: &Value) -> Result<ToolResult, HopeError> {
         let cwd = params["cwd"].as_str();
         match run_git(&["diff"], cwd) {
             Ok(output) => Ok(ToolResult::success("git_diff", output)),
@@ -81,7 +81,7 @@ pub struct GitLogTool;
 impl BaseTool for GitLogTool {
     fn tool_id(&self) -> &str { "git_log" }
     fn spec(&self) -> &ToolSpec { &GIT_LOG_SPEC }
-    fn execute(&self, params: &Value) -> Result<ToolResult, OpenJarvisError> {
+    fn execute(&self, params: &Value) -> Result<ToolResult, HopeError> {
         let cwd = params["cwd"].as_str();
         let n = params["n"].as_i64().unwrap_or(10);
         match run_git(&["log", "--oneline", &format!("-{}", n)], cwd) {

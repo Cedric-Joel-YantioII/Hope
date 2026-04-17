@@ -1,7 +1,7 @@
 //! HeuristicRouter — rule-based model selection.
 
 use crate::traits::RouterPolicy;
-use openjarvis_core::RoutingContext;
+use hope_core::RoutingContext;
 
 pub struct HeuristicRouter {
     default_model: String,

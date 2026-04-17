@@ -2,8 +2,8 @@
 
 from unittest.mock import MagicMock
 
-from openjarvis.agents.monitor_operative import MonitorOperativeAgent
-from openjarvis.core.registry import AgentRegistry
+from hope.agents.monitor_operative import MonitorOperativeAgent
+from hope.core.registry import AgentRegistry
 
 
 def _make_engine(content: str = "Hello") -> MagicMock:
@@ -22,7 +22,7 @@ class TestMonitorOperativeAgent:
     def test_registration(self) -> None:
         # Import triggers registration; re-register after autouse fixture
         # clears the registry (same pattern as test_monitor.py)
-        import openjarvis.agents.monitor_operative  # noqa: F401
+        import hope.agents.monitor_operative  # noqa: F401
 
         if not AgentRegistry.contains("monitor_operative"):
             AgentRegistry.register_value("monitor_operative", MonitorOperativeAgent)

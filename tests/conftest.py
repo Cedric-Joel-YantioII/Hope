@@ -7,9 +7,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from openjarvis.core.config import GpuInfo, HardwareInfo
-from openjarvis.core.events import EventBus, reset_event_bus
-from openjarvis.core.registry import (
+from hope.core.config import GpuInfo, HardwareInfo
+from hope.core.events import EventBus, reset_event_bus
+from hope.core.registry import (
     AgentRegistry,
     BenchmarkRegistry,
     ChannelRegistry,

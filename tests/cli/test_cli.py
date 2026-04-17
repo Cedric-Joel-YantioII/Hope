@@ -7,20 +7,20 @@ from unittest import mock
 
 from click.testing import CliRunner
 
-import openjarvis
-from openjarvis.cli import cli
+import hope
+from hope.cli import cli
 
 
 class TestCLI:
     def test_help(self) -> None:
         result = CliRunner().invoke(cli, ["--help"])
         assert result.exit_code == 0
-        assert "OpenJarvis" in result.output
+        assert "Hope" in result.output
 
     def test_version(self) -> None:
         result = CliRunner().invoke(cli, ["--version"])
         assert result.exit_code == 0
-        assert openjarvis.__version__ in result.output
+        assert hope.__version__ in result.output
 
     def test_ask_requires_query(self) -> None:
         result = CliRunner().invoke(cli, ["ask"])
@@ -76,12 +76,12 @@ class TestCLI:
         assert "list" in result.output
 
     def test_init_creates_config(self, tmp_path: Path) -> None:
-        config_dir = tmp_path / ".openjarvis"
+        config_dir = tmp_path / ".hope"
         config_path = config_dir / "config.toml"
         with (
-            mock.patch("openjarvis.cli.init_cmd.DEFAULT_CONFIG_DIR", config_dir),
-            mock.patch("openjarvis.cli.init_cmd.DEFAULT_CONFIG_PATH", config_path),
-            mock.patch("openjarvis.cli.init_cmd.PrivacyScanner"),
+            mock.patch("hope.cli.init_cmd.DEFAULT_CONFIG_DIR", config_dir),
+            mock.patch("hope.cli.init_cmd.DEFAULT_CONFIG_PATH", config_path),
+            mock.patch("hope.cli.init_cmd.PrivacyScanner"),
         ):
             result = CliRunner().invoke(
                 cli, ["init", "--engine", "ollama", "--no-download"]

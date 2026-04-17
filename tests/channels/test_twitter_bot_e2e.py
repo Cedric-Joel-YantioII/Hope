@@ -23,9 +23,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from openjarvis.channels._stubs import ChannelMessage
-from openjarvis.channels.twitter_channel import TwitterChannel
-from openjarvis.tools.http_request import HttpRequestTool
+from hope.channels._stubs import ChannelMessage
+from hope.channels.twitter_channel import TwitterChannel
+from hope.tools.http_request import HttpRequestTool
 
 # Add examples dir to path so we can import the bot module
 _EXAMPLES_DIR = os.path.join(
@@ -56,12 +56,12 @@ class TestClassifyMention:
     @pytest.mark.parametrize(
         "text,expected",
         [
-            ("@OpenJarvisAI bug: the memory_search tool crashes", "BUG_REPORT"),
-            ("@OpenJarvisAI crash when I run jarvis ask", "BUG_REPORT"),
-            ("@OpenJarvisAI error on startup with ollama", "BUG_REPORT"),
-            ("@OpenJarvisAI the CLI fails after update", "BUG_REPORT"),
-            ("@OpenJarvisAI broken link in the docs", "BUG_REPORT"),
-            ("@OpenJarvisAI segfault with large file", "BUG_REPORT"),
+            ("@HopeAI bug: the memory_search tool crashes", "BUG_REPORT"),
+            ("@HopeAI crash when I run hope ask", "BUG_REPORT"),
+            ("@HopeAI error on startup with ollama", "BUG_REPORT"),
+            ("@HopeAI the CLI fails after update", "BUG_REPORT"),
+            ("@HopeAI broken link in the docs", "BUG_REPORT"),
+            ("@HopeAI segfault with large file", "BUG_REPORT"),
         ],
     )
     def test_bug_report(self, text, expected):
@@ -70,16 +70,16 @@ class TestClassifyMention:
     @pytest.mark.parametrize(
         "text,expected",
         [
-            ("@OpenJarvisAI feature request: add a scheduler UI", "FEATURE_REQUEST"),
-            ("@OpenJarvisAI would love a web dashboard", "FEATURE_REQUEST"),
+            ("@HopeAI feature request: add a scheduler UI", "FEATURE_REQUEST"),
+            ("@HopeAI would love a web dashboard", "FEATURE_REQUEST"),
             (
-                "@OpenJarvisAI it would be great to have notifications",
+                "@HopeAI it would be great to have notifications",
                 "FEATURE_REQUEST",
             ),
-            ("@OpenJarvisAI I wish there was a mobile app", "FEATURE_REQUEST"),
-            ("@OpenJarvisAI please add dark mode", "FEATURE_REQUEST"),
-            ("@OpenJarvisAI can you add voice input?", "FEATURE_REQUEST"),
-            ("@OpenJarvisAI any plans for a VS Code extension?", "FEATURE_REQUEST"),
+            ("@HopeAI I wish there was a mobile app", "FEATURE_REQUEST"),
+            ("@HopeAI please add dark mode", "FEATURE_REQUEST"),
+            ("@HopeAI can you add voice input?", "FEATURE_REQUEST"),
+            ("@HopeAI any plans for a VS Code extension?", "FEATURE_REQUEST"),
         ],
     )
     def test_feature_request(self, text, expected):
@@ -88,11 +88,11 @@ class TestClassifyMention:
     @pytest.mark.parametrize(
         "text,expected",
         [
-            ("@OpenJarvisAI just discovered this, love it!", "PRAISE"),
-            ("@OpenJarvisAI this is amazing work", "PRAISE"),
-            ("@OpenJarvisAI awesome project, great work!", "PRAISE"),
-            ("@OpenJarvisAI I'm impressed by the speed", "PRAISE"),
-            ("@OpenJarvisAI switched from langchain, incredible", "PRAISE"),
+            ("@HopeAI just discovered this, love it!", "PRAISE"),
+            ("@HopeAI this is amazing work", "PRAISE"),
+            ("@HopeAI awesome project, great work!", "PRAISE"),
+            ("@HopeAI I'm impressed by the speed", "PRAISE"),
+            ("@HopeAI switched from langchain, incredible", "PRAISE"),
         ],
     )
     def test_praise(self, text, expected):
@@ -101,9 +101,9 @@ class TestClassifyMention:
     @pytest.mark.parametrize(
         "text,expected",
         [
-            ("@OpenJarvisAI BUY CRYPTO NOW", "SPAM"),
-            ("@OpenJarvisAI free download link in bio", "SPAM"),
-            ("@OpenJarvisAI guaranteed income 10x returns", "SPAM"),
+            ("@HopeAI BUY CRYPTO NOW", "SPAM"),
+            ("@HopeAI free download link in bio", "SPAM"),
+            ("@HopeAI guaranteed income 10x returns", "SPAM"),
         ],
     )
     def test_spam(self, text, expected):
@@ -112,10 +112,10 @@ class TestClassifyMention:
     @pytest.mark.parametrize(
         "text,expected",
         [
-            ("@OpenJarvisAI how do I add a new channel?", "QUESTION"),
-            ("@OpenJarvisAI what models do you support?", "QUESTION"),
-            ("@OpenJarvisAI does this work on Windows?", "QUESTION"),
-            ("@OpenJarvisAI tell me about the architecture", "QUESTION"),
+            ("@HopeAI how do I add a new channel?", "QUESTION"),
+            ("@HopeAI what models do you support?", "QUESTION"),
+            ("@HopeAI does this work on Windows?", "QUESTION"),
+            ("@HopeAI tell me about the architecture", "QUESTION"),
         ],
     )
     def test_question(self, text, expected):
@@ -162,7 +162,7 @@ class TestPromptBuilders:
 
     def test_bug_prompt_contains_github_url(self):
         prompt = _build_bug_prompt("bob", "456", "crash on startup")
-        assert "api.github.com/repos/open-jarvis/OpenJarvis/issues" in prompt
+        assert "api.github.com/repos/open-hope/Hope/issues" in prompt
         assert "http_request" in prompt
         assert "channel_send" in prompt
         assert "bob" in prompt
@@ -171,7 +171,7 @@ class TestPromptBuilders:
 
     def test_feature_prompt_contains_github_url(self):
         prompt = _build_feature_prompt("carol", "789", "add dark mode")
-        assert "api.github.com/repos/open-jarvis/OpenJarvis/issues" in prompt
+        assert "api.github.com/repos/open-hope/Hope/issues" in prompt
         assert "enhancement" in prompt
         assert "carol" in prompt
         assert "789" in prompt
@@ -229,7 +229,7 @@ class TestMentionPolling:
                 {
                     "id": "111",
                     "author_id": "alice",
-                    "text": "@OpenJarvisAI how do I install?",
+                    "text": "@HopeAI how do I install?",
                     "conversation_id": "111",
                 },
             ],
@@ -262,7 +262,7 @@ class TestMentionPolling:
         msg = handler.call_args[0][0]
         assert isinstance(msg, ChannelMessage)
         assert msg.sender == "alice"
-        assert msg.content == "@OpenJarvisAI how do I install?"
+        assert msg.content == "@HopeAI how do I install?"
         assert msg.message_id == "111"
 
     def test_poll_tracks_since_id(self):
@@ -345,17 +345,17 @@ class TestEnvVarExpansion:
         with (
             patch.dict(os.environ, {"GITHUB_TOKEN": "ghp_test123"}),
             patch(
-                "openjarvis._rust_bridge.get_rust_module",
+                "hope._rust_bridge.get_rust_module",
                 return_value=mock_rust,
             ),
-            patch("openjarvis.tools.http_request.check_ssrf", return_value=None),
+            patch("hope.tools.http_request.check_ssrf", return_value=None),
             patch(
-                "openjarvis.tools.http_request.httpx.request",
+                "hope.tools.http_request.httpx.request",
                 return_value=mock_resp,
             ) as mock_req,
         ):
             result = tool.execute(
-                url="https://api.github.com/repos/open-jarvis/OpenJarvis/issues",
+                url="https://api.github.com/repos/open-hope/Hope/issues",
                 method="POST",
                 headers={
                     "Authorization": "Bearer $GITHUB_TOKEN",
@@ -387,12 +387,12 @@ class TestEnvVarExpansion:
         with (
             patch.dict(os.environ, env, clear=True),
             patch(
-                "openjarvis._rust_bridge.get_rust_module",
+                "hope._rust_bridge.get_rust_module",
                 return_value=mock_rust,
             ),
-            patch("openjarvis.tools.http_request.check_ssrf", return_value=None),
+            patch("hope.tools.http_request.check_ssrf", return_value=None),
             patch(
-                "openjarvis.tools.http_request.httpx.request",
+                "hope.tools.http_request.httpx.request",
                 return_value=mock_resp,
             ) as mock_req,
         ):
@@ -422,12 +422,12 @@ class TestEnvVarExpansion:
 
         with (
             patch(
-                "openjarvis._rust_bridge.get_rust_module",
+                "hope._rust_bridge.get_rust_module",
                 return_value=mock_rust,
             ),
-            patch("openjarvis.tools.http_request.check_ssrf", return_value=None),
+            patch("hope.tools.http_request.check_ssrf", return_value=None),
             patch(
-                "openjarvis.tools.http_request.httpx.request",
+                "hope.tools.http_request.httpx.request",
                 return_value=mock_resp,
             ) as mock_req,
         ):
@@ -442,15 +442,15 @@ class TestEnvVarExpansion:
 
 
 # =========================================================================
-# 5. Full reactive e2e flow (mock Jarvis + TwitterChannel)
+# 5. Full reactive e2e flow (mock Hope + TwitterChannel)
 # =========================================================================
 
 
 class TestFullE2EFlow:
     """Test the full flow: mention arrives → classify → prompt → agent → tool calls."""
 
-    def _make_mock_jarvis(self, responses=None):
-        """Create a mock Jarvis instance that returns canned responses."""
+    def _make_mock_hope(self, responses=None):
+        """Create a mock Hope instance that returns canned responses."""
         j = MagicMock()
         if responses:
             j.ask.side_effect = responses
@@ -466,7 +466,7 @@ class TestFullE2EFlow:
         picks between grounded/deferral prompts. The only tool the agent
         needs for a QUESTION is ``channel_send``.
         """
-        j = self._make_mock_jarvis(["check the docs at open-jarvis.github.io"])
+        j = self._make_mock_hope(["check the docs at open-hope.github.io"])
         tweet = DEMO_TWEETS[0]
 
         mention_type = _classify_mention(tweet["text"])
@@ -491,7 +491,7 @@ class TestFullE2EFlow:
 
     def test_bug_report_flow(self):
         """Bug mention → http_request (GitHub issue) + channel_send."""
-        j = self._make_mock_jarvis(["opened an issue for this"])
+        j = self._make_mock_hope(["opened an issue for this"])
         tweet = DEMO_TWEETS[1]
 
         mention_type = _classify_mention(tweet["text"])
@@ -513,7 +513,7 @@ class TestFullE2EFlow:
 
     def test_feature_request_flow(self):
         """Feature mention → http_request (GitHub issue) + channel_send."""
-        j = self._make_mock_jarvis(
+        j = self._make_mock_hope(
             ["love this idea — opened an issue to track it"],
         )
         tweet = DEMO_TWEETS[2]
@@ -537,7 +537,7 @@ class TestFullE2EFlow:
 
     def test_praise_flow(self):
         """Praise mention → channel_send only."""
-        j = self._make_mock_jarvis(["thanks, glad you like it!"])
+        j = self._make_mock_hope(["thanks, glad you like it!"])
         tweet = DEMO_TWEETS[3]
 
         mention_type = _classify_mention(tweet["text"])
@@ -550,8 +550,8 @@ class TestFullE2EFlow:
         assert call_kwargs[1]["tools"] == ["channel_send"]
 
     def test_spam_is_ignored(self):
-        """Spam mentions should be skipped — no Jarvis.ask call."""
-        j = self._make_mock_jarvis()
+        """Spam mentions should be skipped — no Hope.ask call."""
+        j = self._make_mock_hope()
         tweet = DEMO_TWEETS[4]
 
         mention_type = _classify_mention(tweet["text"])
@@ -647,21 +647,21 @@ class TestGitHubIssueCreation:
         mock_resp.status_code = 201
         mock_resp.text = json.dumps({
             "number": 42,
-            "html_url": "https://github.com/open-jarvis/OpenJarvis/issues/42",
+            "html_url": "https://github.com/open-hope/Hope/issues/42",
         })
         mock_resp.headers = {"content-type": "application/json"}
 
         with (
             patch.dict(os.environ, {"GITHUB_TOKEN": "ghp_testtoken123"}),
-            patch("openjarvis._rust_bridge.get_rust_module", return_value=mock_rust),
-            patch("openjarvis.tools.http_request.check_ssrf", return_value=None),
+            patch("hope._rust_bridge.get_rust_module", return_value=mock_rust),
+            patch("hope.tools.http_request.check_ssrf", return_value=None),
             patch(
-                "openjarvis.tools.http_request.httpx.request",
+                "hope.tools.http_request.httpx.request",
                 return_value=mock_resp,
             ) as mock_req,
         ):
             result = tool.execute(
-                url="https://api.github.com/repos/open-jarvis/OpenJarvis/issues",
+                url="https://api.github.com/repos/open-hope/Hope/issues",
                 method="POST",
                 headers={
                     "Authorization": "Bearer $GITHUB_TOKEN",
@@ -708,15 +708,15 @@ class TestGitHubIssueCreation:
 
         with (
             patch.dict(os.environ, {"GITHUB_TOKEN": "ghp_testtoken123"}),
-            patch("openjarvis._rust_bridge.get_rust_module", return_value=mock_rust),
-            patch("openjarvis.tools.http_request.check_ssrf", return_value=None),
+            patch("hope._rust_bridge.get_rust_module", return_value=mock_rust),
+            patch("hope.tools.http_request.check_ssrf", return_value=None),
             patch(
-                "openjarvis.tools.http_request.httpx.request",
+                "hope.tools.http_request.httpx.request",
                 return_value=mock_resp,
             ) as mock_req,
         ):
             result = tool.execute(
-                url="https://api.github.com/repos/open-jarvis/OpenJarvis/issues",
+                url="https://api.github.com/repos/open-hope/Hope/issues",
                 method="POST",
                 headers={
                     "Authorization": "Bearer $GITHUB_TOKEN",

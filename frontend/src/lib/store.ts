@@ -28,13 +28,13 @@ export interface AgentEvent {
 
 // ── localStorage persistence ──────────────────────────────────────────
 
-const CONVERSATIONS_KEY = 'openjarvis-conversations';
-const SETTINGS_KEY = 'openjarvis-settings';
-const OPTIN_KEY = 'openjarvis-optin';
-const OPTIN_NAME_KEY = 'openjarvis-display-name';
-const OPTIN_EMAIL_KEY = 'openjarvis-email';
-const OPTIN_ANONID_KEY = 'openjarvis-anon-id';
-const OPTIN_SEEN_KEY = 'openjarvis-optin-seen';
+const CONVERSATIONS_KEY = 'hope-conversations';
+const SETTINGS_KEY = 'hope-settings';
+const OPTIN_KEY = 'hope-optin';
+const OPTIN_NAME_KEY = 'hope-display-name';
+const OPTIN_EMAIL_KEY = 'hope-email';
+const OPTIN_ANONID_KEY = 'hope-anon-id';
+const OPTIN_SEEN_KEY = 'hope-optin-seen';
 
 interface ConversationStore {
   version: 1;

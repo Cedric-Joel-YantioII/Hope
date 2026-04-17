@@ -1,3 +1,5 @@
+## [Unreleased] - Renamed to Hope
+
 # Changelog
 
 All notable changes to OpenJarvis are documented in this file.

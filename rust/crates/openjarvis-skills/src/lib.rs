@@ -1,4 +1,4 @@
-//! OpenJarvis Skills — skill manifests, execution results, and signature verification.
+//! Hope Skills — skill manifests, execution results, and signature verification.
 
 use ed25519_dalek::{Signature, VerifyingKey};
 use serde::{Deserialize, Serialize};
@@ -106,7 +106,7 @@ mod tests {
 name = "file-organizer"
 version = "0.1.0"
 description = "Organizes files by extension"
-author = "openjarvis"
+author = "hope"
 signature = ""
 required_capabilities = ["file_read", "file_write"]
 

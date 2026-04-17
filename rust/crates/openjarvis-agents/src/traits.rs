@@ -1,8 +1,8 @@
 //! OjAgent trait — interface for all agent implementations.
 
-use openjarvis_core::{AgentContext, AgentResult, OpenJarvisError};
+use hope_core::{AgentContext, AgentResult, HopeError};
 
-/// Core agent trait for all OpenJarvis agents.
+/// Core agent trait for all Hope agents.
 ///
 /// Renamed from `Agent` to `OjAgent` to avoid collision with `rig::agent::Agent`.
 /// Async to support rig-core's async model.
@@ -16,5 +16,5 @@ pub trait OjAgent: Send + Sync {
         &self,
         input: &str,
         context: Option<&AgentContext>,
-    ) -> Result<AgentResult, OpenJarvisError>;
+    ) -> Result<AgentResult, HopeError>;
 }

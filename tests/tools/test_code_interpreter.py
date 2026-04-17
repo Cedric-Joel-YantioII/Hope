@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from openjarvis.core.registry import ToolRegistry
-from openjarvis.tools.code_interpreter import CodeInterpreterTool
+from hope.core.registry import ToolRegistry
+from hope.tools.code_interpreter import CodeInterpreterTool
 
 
 class TestCodeInterpreterTool:

@@ -1,7 +1,7 @@
 //! GRPORouterPolicy — softmax sampling with group relative advantage.
 
 use crate::traits::RouterPolicy;
-use openjarvis_core::RoutingContext;
+use hope_core::RoutingContext;
 use parking_lot::Mutex;
 use rand::prelude::*;
 use std::collections::HashMap;

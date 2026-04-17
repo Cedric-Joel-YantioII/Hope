@@ -1,6 +1,6 @@
 //! Pub/sub event bus for cross-cutting concerns.
 //!
-//! Rust translation of `src/openjarvis/core/events.py`.
+//! Rust translation of `src/hope/core/events.py`.
 
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};

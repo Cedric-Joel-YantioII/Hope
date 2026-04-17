@@ -1,6 +1,6 @@
 //! AgentConfigEvolver — analyze traces to produce agent configuration recommendations.
 //!
-//! Ported from Python `openjarvis.learning.agent_evolver`.
+//! Ported from Python `hope.learning.agent_evolver`.
 //! File I/O (TOML writing, versioning, rollback) stays in Python;
 //! this module provides pure analysis and scoring logic.
 

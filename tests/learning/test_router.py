@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from openjarvis.core.registry import ModelRegistry
-from openjarvis.core.types import ModelSpec
-from openjarvis.learning._stubs import RoutingContext
-from openjarvis.learning.routing.router import (
+from hope.core.registry import ModelRegistry
+from hope.core.types import ModelSpec
+from hope.learning._stubs import RoutingContext
+from hope.learning.routing.router import (
     HeuristicRouter,
     build_routing_context,
 )

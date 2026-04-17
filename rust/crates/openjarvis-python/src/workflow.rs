@@ -5,7 +5,7 @@ use std::collections::HashMap;
 
 #[pyclass(name = "WorkflowGraph")]
 pub struct PyWorkflowGraph {
-    inner: openjarvis_workflow::WorkflowGraph,
+    inner: hope_workflow::WorkflowGraph,
 }
 
 #[pymethods]
@@ -14,7 +14,7 @@ impl PyWorkflowGraph {
     #[pyo3(signature = (name=""))]
     fn new(name: &str) -> Self {
         Self {
-            inner: openjarvis_workflow::WorkflowGraph::new(name),
+            inner: hope_workflow::WorkflowGraph::new(name),
         }
     }
 
@@ -26,14 +26,14 @@ impl PyWorkflowGraph {
         tools: Vec<String>,
     ) -> PyResult<()> {
         let nt = match node_type {
-            "tool" => openjarvis_workflow::NodeType::Tool,
-            "condition" => openjarvis_workflow::NodeType::Condition,
-            "parallel" => openjarvis_workflow::NodeType::Parallel,
-            "loop" => openjarvis_workflow::NodeType::Loop,
-            "transform" => openjarvis_workflow::NodeType::Transform,
-            _ => openjarvis_workflow::NodeType::Agent,
+            "tool" => hope_workflow::NodeType::Tool,
+            "condition" => hope_workflow::NodeType::Condition,
+            "parallel" => hope_workflow::NodeType::Parallel,
+            "loop" => hope_workflow::NodeType::Loop,
+            "transform" => hope_workflow::NodeType::Transform,
+            _ => hope_workflow::NodeType::Agent,
         };
-        let node = openjarvis_workflow::WorkflowNode {
+        let node = hope_workflow::WorkflowNode {
             id: id.to_string(),
             node_type: nt,
             agent: agent.to_string(),
@@ -49,7 +49,7 @@ impl PyWorkflowGraph {
     }
 
     fn add_edge(&mut self, source: &str, target: &str) -> PyResult<()> {
-        let edge = openjarvis_workflow::WorkflowEdge {
+        let edge = hope_workflow::WorkflowEdge {
             source: source.to_string(),
             target: target.to_string(),
             condition: String::new(),
@@ -84,7 +84,7 @@ impl PyWorkflowGraph {
 
 #[pyclass(name = "WorkflowBuilder")]
 pub struct PyWorkflowBuilder {
-    inner: Option<openjarvis_workflow::WorkflowBuilder>,
+    inner: Option<hope_workflow::WorkflowBuilder>,
 }
 
 #[pymethods]
@@ -93,7 +93,7 @@ impl PyWorkflowBuilder {
     #[pyo3(signature = (name=""))]
     fn new(name: &str) -> Self {
         Self {
-            inner: Some(openjarvis_workflow::WorkflowBuilder::new(name)),
+            inner: Some(hope_workflow::WorkflowBuilder::new(name)),
         }
     }
 

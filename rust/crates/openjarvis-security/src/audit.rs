@@ -1,7 +1,7 @@
 //! Audit logger — persist security events to SQLite with Merkle hash chain.
 
 use crate::types::{ScanFinding, SecurityEvent, SecurityEventType};
-use openjarvis_core::OpenJarvisError;
+use hope_core::HopeError;
 use rusqlite::Connection;
 use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
@@ -12,15 +12,15 @@ pub struct AuditLogger {
 }
 
 impl AuditLogger {
-    pub fn new(db_path: &Path) -> Result<Self, OpenJarvisError> {
+    pub fn new(db_path: &Path) -> Result<Self, HopeError> {
         if let Some(parent) = db_path.parent() {
             std::fs::create_dir_all(parent).map_err(|e| {
-                OpenJarvisError::Io(std::io::Error::other(e))
+                HopeError::Io(std::io::Error::other(e))
             })?;
         }
 
         let conn = Connection::open(db_path).map_err(|e| {
-            OpenJarvisError::Io(std::io::Error::other(
+            HopeError::Io(std::io::Error::other(
                 e.to_string(),
             ))
         })?;
@@ -38,7 +38,7 @@ impl AuditLogger {
             )",
         )
         .map_err(|e| {
-            OpenJarvisError::Io(std::io::Error::other(
+            HopeError::Io(std::io::Error::other(
                 e.to_string(),
             ))
         })?;
@@ -49,7 +49,7 @@ impl AuditLogger {
         })
     }
 
-    pub fn log(&self, event: &SecurityEvent) -> Result<(), OpenJarvisError> {
+    pub fn log(&self, event: &SecurityEvent) -> Result<(), HopeError> {
         let findings_json = serde_json::to_string(&event.findings).unwrap_or_default();
         let prev_hash = self.tail_hash();
 
@@ -81,7 +81,7 @@ impl AuditLogger {
                 ],
             )
             .map_err(|e| {
-                OpenJarvisError::Io(std::io::Error::other(
+                HopeError::Io(std::io::Error::other(
                     e.to_string(),
                 ))
             })?;
@@ -101,7 +101,7 @@ impl AuditLogger {
 
     /// Verify the Merkle hash chain integrity.
     /// Returns `(true, None)` if valid, or `(false, Some(row_id))` for first broken link.
-    pub fn verify_chain(&self) -> Result<(bool, Option<i64>), OpenJarvisError> {
+    pub fn verify_chain(&self) -> Result<(bool, Option<i64>), HopeError> {
         let mut stmt = self
             .conn
             .prepare(
@@ -110,7 +110,7 @@ impl AuditLogger {
                  FROM security_events ORDER BY id",
             )
             .map_err(|e| {
-                OpenJarvisError::Io(std::io::Error::other(
+                HopeError::Io(std::io::Error::other(
                     e.to_string(),
                 ))
             })?;
@@ -129,7 +129,7 @@ impl AuditLogger {
                 ))
             })
             .map_err(|e| {
-                OpenJarvisError::Io(std::io::Error::other(
+                HopeError::Io(std::io::Error::other(
                     e.to_string(),
                 ))
             })?;
@@ -139,7 +139,7 @@ impl AuditLogger {
         for row_result in rows {
             let (rid, ts, etype, fj, preview, action, stored_hash, stored_prev) =
                 row_result.map_err(|e| {
-                    OpenJarvisError::Io(std::io::Error::other(
+                    HopeError::Io(std::io::Error::other(
                         e.to_string(),
                     ))
                 })?;
@@ -184,7 +184,7 @@ impl AuditLogger {
         event_type: Option<&str>,
         since: Option<f64>,
         limit: usize,
-    ) -> Result<Vec<SecurityEvent>, OpenJarvisError> {
+    ) -> Result<Vec<SecurityEvent>, HopeError> {
         let mut sql = String::from(
             "SELECT timestamp, event_type, findings_json, content_preview, action_taken
              FROM security_events WHERE 1=1",
@@ -206,7 +206,7 @@ impl AuditLogger {
             params.iter().map(|p| p.as_ref()).collect();
 
         let mut stmt = self.conn.prepare(&sql).map_err(|e| {
-            OpenJarvisError::Io(std::io::Error::other(
+            HopeError::Io(std::io::Error::other(
                 e.to_string(),
             ))
         })?;
@@ -222,7 +222,7 @@ impl AuditLogger {
                 ))
             })
             .map_err(|e| {
-                OpenJarvisError::Io(std::io::Error::other(
+                HopeError::Io(std::io::Error::other(
                     e.to_string(),
                 ))
             })?;
@@ -231,7 +231,7 @@ impl AuditLogger {
         for row_result in rows {
             let (ts, _etype, findings_json, preview, action) =
                 row_result.map_err(|e| {
-                    OpenJarvisError::Io(std::io::Error::other(
+                    HopeError::Io(std::io::Error::other(
                         e.to_string(),
                     ))
                 })?;

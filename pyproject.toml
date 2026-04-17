@@ -3,14 +3,14 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "OpenJarvis"
+name = "Hope"
 version = "0.1.1"
-description = "OpenJarvis — modular AI assistant backend with composable intelligence primitives"
+description = "Hope — modular AI assistant backend with composable intelligence primitives"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "Apache-2.0"}
 authors = [
-    {name = "Open Jarvis Contributors"},
+    {name = "Open Hope Contributors"},
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -106,6 +106,10 @@ channel-gmail = [
     "google-auth-httplib2>=0.2",
 ]
 browser = ["playwright>=1.40"]
+capture = [
+    "mss>=9.0",
+    "pillow>=10",
+]
 media = ["openai>=1.30"]
 pdf = ["pdfplumber>=0.10"]
 scheduler = ["croniter>=2.0"]
@@ -126,20 +130,20 @@ docs = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/open-jarvis/OpenJarvis"
-Documentation = "https://open-jarvis.github.io/OpenJarvis/"
-Repository = "https://github.com/open-jarvis/OpenJarvis"
-Issues = "https://github.com/open-jarvis/OpenJarvis/issues"
+Homepage = "https://github.com/open-hope/Hope"
+Documentation = "https://open-hope.github.io/Hope/"
+Repository = "https://github.com/open-hope/Hope"
+Issues = "https://github.com/open-hope/Hope/issues"
 
 [project.scripts]
-jarvis = "openjarvis.cli:main"
+hope = "hope.cli:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/openjarvis"]
+packages = ["src/hope"]
 
 [tool.hatch.build.targets.wheel.force-include]
-"src/openjarvis/agents/claude_code_runner" = "_node_modules/claude_code_runner"
-"src/openjarvis/channels/whatsapp_baileys_bridge" = "_node_modules/whatsapp_baileys_bridge"
+"src/hope/agents/claude_code_runner" = "_node_modules/claude_code_runner"
+"src/hope/channels/whatsapp_baileys_bridge" = "_node_modules/whatsapp_baileys_bridge"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -162,8 +166,8 @@ src = ["src", "tests"]
 select = ["E", "F", "I", "W"]
 
 [tool.ruff.lint.per-file-ignores]
-"src/openjarvis/evals/datasets/*.py" = ["E501"]
-"src/openjarvis/evals/scorers/*.py" = ["E501"]
+"src/hope/evals/datasets/*.py" = ["E501"]
+"src/hope/evals/scorers/*.py" = ["E501"]
 
 [dependency-groups]
 dev = [
