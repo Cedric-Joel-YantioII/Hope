@@ -1,9 +1,15 @@
-"""Tests for ``hope start|stop|restart|status`` daemon management commands."""
+"""Tests for ``hope start|stop|restart|status`` daemon management commands.
+
+Top-level ``start``/``status`` have moved to the brain-daemon module
+(:mod:`hope.daemon.core` + :mod:`hope.cli.start_cmd` /
+:mod:`hope.cli.status_cmd`). ``stop``/``restart`` still live in the
+legacy :mod:`hope.cli.daemon_cmd` and target the API-server PID file.
+"""
 
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from click.testing import CliRunner
 
@@ -11,32 +17,16 @@ from hope.cli import cli
 from hope.cli.daemon_cmd import _read_pid, _write_pid
 
 
-class TestDaemonCommands:
-    """Core daemon CLI tests."""
-
-    def test_start_command_exists(self) -> None:
-        """``hope start --help`` succeeds."""
-        result = CliRunner().invoke(cli, ["start", "--help"])
-        assert result.exit_code == 0
-        out = result.output.lower()
-        assert "daemon" in out or "start" in out or "background" in out
+class TestLegacyStopRestart:
+    """The old server-daemon stop/restart verbs are still wired."""
 
     def test_stop_no_server(self) -> None:
-        """``hope stop`` when no PID file shows 'not running'."""
         with patch("hope.cli.daemon_cmd._read_pid", return_value=None):
             result = CliRunner().invoke(cli, ["stop"])
         assert result.exit_code != 0
         assert "No running server" in result.output
 
-    def test_status_no_server(self) -> None:
-        """``hope status`` when no PID file shows 'not running'."""
-        with patch("hope.cli.daemon_cmd._read_pid", return_value=None):
-            result = CliRunner().invoke(cli, ["status"])
-        assert result.exit_code == 0
-        assert "not running" in result.output
-
     def test_read_pid_no_file(self, tmp_path: Path) -> None:
-        """``_read_pid()`` returns None when no PID file exists."""
         with patch(
             "hope.cli.daemon_cmd._PID_FILE",
             tmp_path / "nonexistent.pid",
@@ -44,7 +34,6 @@ class TestDaemonCommands:
             assert _read_pid() is None
 
     def test_write_and_read_pid(self, tmp_path: Path) -> None:
-        """Write a PID, then read it back (mock os.kill to succeed)."""
         pid_file = tmp_path / "server.pid"
         with (
             patch("hope.cli.daemon_cmd._PID_FILE", pid_file),
@@ -55,27 +44,24 @@ class TestDaemonCommands:
             assert pid_file.exists()
             assert _read_pid() == 12345
 
-    def test_status_shows_running(self) -> None:
-        """``hope status`` shows running info when PID exists."""
-        mock_config = MagicMock()
-        mock_config.server.host = "127.0.0.1"
-        mock_config.server.port = 8000
 
-        with (
-            patch("hope.cli.daemon_cmd._read_pid", return_value=9999),
-            patch(
-                "hope.cli.daemon_cmd.load_config",
-                return_value=mock_config,
-            ),
-        ):
+class TestBrainDaemonCommands:
+    """Top-level ``start``/``status`` now drive the brain daemon."""
+
+    def test_start_command_exists(self) -> None:
+        result = CliRunner().invoke(cli, ["start", "--help"])
+        assert result.exit_code == 0
+        out = result.output.lower()
+        assert "start" in out
+
+    def test_status_no_daemon(self) -> None:
+        with patch("hope.daemon.core.read_pid", return_value=None):
             result = CliRunner().invoke(cli, ["status"])
         assert result.exit_code == 0
-        assert "running" in result.output
-        assert "9999" in result.output
+        assert "not running" in result.output
 
     def test_start_already_running(self) -> None:
-        """``hope start`` exits with error when a server is already running."""
-        with patch("hope.cli.daemon_cmd._read_pid", return_value=42):
+        with patch("hope.daemon.core.read_pid", return_value=42):
             result = CliRunner().invoke(cli, ["start"])
         assert result.exit_code != 0
         assert "already running" in result.output

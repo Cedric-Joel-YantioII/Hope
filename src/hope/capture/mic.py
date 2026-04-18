@@ -115,6 +115,12 @@ class MicCapture:
         self._stream: Optional["sd.RawInputStream"] = None
         self._lock = threading.Lock()
         self._running = False
+        # Additive frame-tap: listeners registered via :meth:`subscribe` are
+        # invoked synchronously from the PortAudio callback with every frame,
+        # alongside the queue ``put``. Used by the wake-word subsystem so it
+        # can peek at frames without racing ``VADGatedSegmenter`` for the
+        # queue. Listeners MUST be non-blocking.
+        self._frame_listeners: List[Callable[[MicFrame], None]] = []
 
     # -- lifecycle ----------------------------------------------------------
 
@@ -132,16 +138,25 @@ class MicCapture:
             def _callback(indata, frames, time_info, status) -> None:  # type: ignore[no-untyped-def]
                 if status:
                     logger.debug("sounddevice status: %s", status)
+                frame = MicFrame(
+                    pcm=bytes(indata), timestamp=time_info.inputBufferAdcTime
+                )
                 try:
-                    self._queue.put_nowait(
-                        MicFrame(pcm=bytes(indata), timestamp=time_info.inputBufferAdcTime)
-                    )
+                    self._queue.put_nowait(frame)
                 except queue.Full:
                     # Drop oldest to keep latency bounded — VAD only needs ~30s.
                     try:
                         self._queue.get_nowait()
                     except queue.Empty:
                         pass
+                # Fan out to any non-blocking listeners (e.g. clap detector).
+                # Listeners own their error handling; we shield the audio
+                # callback from exceptions so the mic stream never dies.
+                for listener in list(self._frame_listeners):
+                    try:
+                        listener(frame)
+                    except Exception as exc:  # pragma: no cover — defensive
+                        logger.warning("mic frame listener raised: %s", exc)
 
             self._stream = sd.RawInputStream(
                 samplerate=SAMPLE_RATE_HZ,
@@ -179,6 +194,28 @@ class MicCapture:
     def queue(self) -> "queue.Queue[MicFrame]":
         """Queue of captured frames (newest always appended to the right)."""
         return self._queue
+
+    # -- frame fan-out ------------------------------------------------------
+
+    def subscribe(self, callback: Callable[[MicFrame], None]) -> None:
+        """Register a non-blocking *callback* to receive every frame.
+
+        The callback runs synchronously on the PortAudio callback thread,
+        so it MUST return quickly (no I/O, no heavy compute). Exceptions
+        are caught and logged so a bad listener cannot kill the stream.
+        Safe to call before or after :meth:`start`.
+        """
+        with self._lock:
+            if callback not in self._frame_listeners:
+                self._frame_listeners.append(callback)
+
+    def unsubscribe(self, callback: Callable[[MicFrame], None]) -> None:
+        """Remove a previously-registered frame listener. Idempotent."""
+        with self._lock:
+            try:
+                self._frame_listeners.remove(callback)
+            except ValueError:
+                pass
 
     @staticmethod
     def list_devices() -> List[dict]:

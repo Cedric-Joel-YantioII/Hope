@@ -15,7 +15,11 @@ from hope.cli.chat_cmd import chat
 from hope.cli.compose_cmd import compose
 from hope.cli.config_cmd import config
 from hope.cli.connect_cmd import connect
-from hope.cli.daemon_cmd import restart, start, status, stop
+from hope.cli.daemon_cmd import restart, stop
+from hope.cli.sleep_cmd import sleep as sleep_cmd
+from hope.cli.start_cmd import start
+from hope.cli.status_cmd import status
+from hope.cli.wake_cmd import wake as wake_cmd
 from hope.cli.deep_research_setup_cmd import deep_research_setup
 from hope.cli.digest_cmd import digest
 from hope.cli.doctor_cmd import doctor
@@ -80,6 +84,8 @@ cli.add_command(start, "start")
 cli.add_command(stop, "stop")
 cli.add_command(restart, "restart")
 cli.add_command(status, "status")
+cli.add_command(wake_cmd, "wake")
+cli.add_command(sleep_cmd, "sleep")
 cli.add_command(vault, "vault")
 cli.add_command(add, "add")
 cli.add_command(operators, "operators")

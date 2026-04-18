@@ -1420,6 +1420,33 @@ class DigestConfig:
 
 
 @dataclass
+class WakeConfig:
+    """Wake-up subsystem settings (clap + spoken phrase detectors).
+
+    Consumed by :class:`hope.wakeword.WakeMonitor`. Defaults are tuned for
+    an M2 MacBook in a quiet room; users in noisier environments may want
+    to raise ``clap_min_peak_dbfs`` and drop ``clap_quiet_floor_dbfs``.
+    """
+
+    enabled: bool = True
+    phrases: List[str] = field(
+        default_factory=lambda: [
+            "wake up hope",
+            "hey hope",
+            "hope wake up",
+            "ok hope",
+        ]
+    )
+    clap_enabled: bool = True
+    clap_min_peak_dbfs: float = -20.0  # transient must exceed this (loud)
+    clap_quiet_floor_dbfs: float = -50.0  # room silence floor (quiet)
+    clap_min_gap_ms: int = 150  # min spacing between the two claps
+    clap_max_gap_ms: int = 600  # max spacing between the two claps
+    refractory_sec: float = 3.0  # suppress retriggers within this window
+    voice_min_confidence: float = 0.5  # skip low-confidence transcripts
+
+
+@dataclass
 class HopeConfig:
     """Top-level configuration for Hope."""
 
@@ -1441,6 +1468,7 @@ class HopeConfig:
     a2a: A2AConfig = field(default_factory=A2AConfig)
     operators: OperatorsConfig = field(default_factory=OperatorsConfig)
     speech: SpeechConfig = field(default_factory=SpeechConfig)
+    wake: WakeConfig = field(default_factory=WakeConfig)
     vision: VisionConfig = field(default_factory=VisionConfig)
     optimize: OptimizeConfig = field(default_factory=OptimizeConfig)
     agent_manager: AgentManagerConfig = field(default_factory=AgentManagerConfig)

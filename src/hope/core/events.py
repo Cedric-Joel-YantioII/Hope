@@ -95,6 +95,11 @@ class EventType(str, Enum):
     PANE_KILLED = "pane_killed"
     PANE_MESSAGE = "pane_message"
     SPECIALIST_AT_CAPACITY = "specialist_at_capacity"
+    # Wake-up protocol — emitted by :class:`hope.wakeword.WakeMonitor`
+    # (voice/clap) or by ``hope wake`` CLI. Payload shape::
+    #     {"source": "voice" | "clap" | "manual",
+    #      "text": Optional[str], "timestamp": float}
+    WAKE_TRIGGER = "wake_trigger"
 
 
 @dataclass(slots=True)
