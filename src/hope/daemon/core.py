@@ -231,29 +231,29 @@ class HopeDaemon:
     # ── lifecycle ────────────────────────────────────────────────────
 
     def start(self) -> DaemonState:
-        """Bring the daemon up. Idempotent.
+        """Bring the daemon up in *sleeping* mode. Idempotent.
+
+        Hope starts asleep: the daemon, wake monitor, and control socket
+        come up, but the tmux brain pane is NOT spawned. The first
+        ``WAKE_TRIGGER`` (from clap, phrase, or ``hope wake``) spawns the
+        Claude Code pane.
 
         Order of operations:
-          1. Lazily construct a :class:`TmuxOrchestrator` if one wasn't
-             injected, then call its ``.start()``. The orchestrator
-             spawns hope-main and opens the pane bus socket.
-          2. Subscribe the wake-trigger handler.
+          1. Lazily construct a :class:`TmuxOrchestrator` (but do NOT
+             start it — the brain is dormant until wake).
+          2. Subscribe the wake-trigger handler that spawns the brain on
+             demand.
           3. Best-effort start a :class:`WakeMonitor`. Import failure →
-             log a warning and continue (sibling agent may still be
-             working on the module).
+             log a warning and continue.
           4. Write the daemon PID file and bind the control socket.
           5. Install SIGTERM/SIGINT handlers.
         """
-        # Orchestrator
+        # Orchestrator — instantiate but leave dormant. Wake handler
+        # calls .start() on first WAKE_TRIGGER.
         if self._orchestrator is None:
             from hope.agents.tmux_orchestrator import TmuxOrchestrator
 
             self._orchestrator = TmuxOrchestrator(bus=self._bus)
-        try:
-            self._orchestrator.start()
-        except Exception:
-            logger.exception("orchestrator.start() failed")
-            raise
 
         # Wake-trigger handler (always subscribed so manual CLI wake works
         # even if the mic-based WakeMonitor is unavailable).
@@ -283,11 +283,53 @@ class HopeDaemon:
 
         self._started_at = time.time()
         logger.info(
-            "Hope daemon started pid=%d hope-main=%s",
+            "Hope daemon started (sleeping) pid=%d wake_monitor=%s",
             os.getpid(),
-            getattr(self._orchestrator, "hope_main_pane_id", None),
+            self._wake_monitor is not None,
         )
         return self.snapshot()
+
+    def sleep_brain(self) -> None:
+        """Put the brain to sleep; keep the daemon + wake monitor alive.
+
+        Kills hope-main and every live specialist pane but leaves the
+        daemon process running so a subsequent ``WAKE_TRIGGER`` can spawn
+        a fresh brain without re-running ``hope start``. Idempotent.
+
+        Differs from :meth:`shutdown` in that the Python process
+        continues and the wake monitor keeps listening.
+        """
+        orch = self._orchestrator
+        if orch is None or not bool(getattr(orch, "_started", False)):
+            try:
+                say("Hope is already sleeping")
+            except Exception:
+                pass
+            return
+        # TmuxOrchestrator.shutdown() deliberately leaves the hope-main
+        # pane alive (so you can tmux-attach after the daemon exits). For
+        # brain-sleep we want it gone so the next wake starts a fresh
+        # Claude Code CLI.
+        main_id = getattr(orch, "hope_main_pane_id", None)
+        if main_id:
+            try:
+                entry = orch.registry.get(main_id)
+                if entry is not None:
+                    orch._tmux(
+                        ["tmux", "kill-pane", "-t", entry.tmux_target],
+                        check=False,
+                    )
+            except Exception:
+                logger.exception("kill hope-main pane failed during sleep_brain")
+        try:
+            orch.shutdown()
+        except Exception:
+            logger.exception("orchestrator.shutdown() failed during sleep_brain")
+        try:
+            say("Hope is sleeping")
+        except Exception:
+            pass
+        logger.info("Hope brain sleeping; daemon still listening for wake")
 
     def shutdown(self) -> None:
         """Graceful shutdown. Safe to call repeatedly."""
@@ -355,10 +397,9 @@ class HopeDaemon:
             say("Hope is not ready")
             return
 
-        already_awake = bool(getattr(orch, "_started", False)) or bool(
-            getattr(orch, "hope_main_pane_id", None)
-        )
-        if already_awake:
+        # _started is the authoritative signal — hope_main_pane_id can
+        # linger after sleep_brain as a historical reference.
+        if bool(getattr(orch, "_started", False)):
             say("I'm already awake")
             return
         try:
@@ -476,10 +517,19 @@ class HopeDaemon:
             )
             return {"ok": True}
         if cmd == "sleep":
-            # Enqueue shutdown; reply first so the CLI gets a clean ack.
+            # Brain-only sleep — daemon keeps running so the next
+            # WAKE_TRIGGER can spawn a fresh brain.
+            threading.Thread(
+                target=self.sleep_brain,
+                name="hope-daemon-sleep-brain",
+                daemon=True,
+            ).start()
+            return {"ok": True, "brain_sleeping": True}
+        if cmd == "stop":
+            # Full daemon teardown — Python process exits.
             threading.Thread(
                 target=self.shutdown,
-                name="hope-daemon-sleep",
+                name="hope-daemon-stop",
                 daemon=True,
             ).start()
             return {"ok": True, "shutting_down": True}

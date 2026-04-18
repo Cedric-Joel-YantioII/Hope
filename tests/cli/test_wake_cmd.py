@@ -76,43 +76,28 @@ class TestSleepCmd:
         assert "not running" in result.output
 
     def test_graceful_sleep_via_control_socket(self) -> None:
-        # First read_pid returns live pid; subsequent os.kill(pid, 0) raises
-        # to mark process as gone, so the sleep command returns cleanly.
-        call_state = {"killed": False}
-
-        def fake_kill(pid: int, sig: int) -> None:
-            if call_state["killed"]:
-                raise OSError("no such process")
-            # The 0-signal probe after send_control — fake the exit.
-            if sig == 0:
-                raise OSError("gone")
-
+        # hope sleep now = brain-only sleep: daemon stays alive, just ACKs.
         with (
             patch("hope.daemon.core.read_pid", return_value=9090),
             patch(
                 "hope.daemon.core.send_control",
-                return_value={"ok": True, "shutting_down": True},
+                return_value={"ok": True, "brain_sleeping": True},
             ) as mock_send,
-            patch("hope.cli.sleep_cmd.os.kill", side_effect=fake_kill),
-            patch("hope.daemon.core.clear_pid") as mock_clear,
         ):
             result = CliRunner().invoke(cli, ["sleep"])
         assert result.exit_code == 0, result.output
-        assert "Hope stopped" in result.output
+        assert "Brain is sleeping" in result.output
         mock_send.assert_called_once()
-        mock_clear.assert_called()
+        # PID file intentionally NOT cleared — daemon keeps running.
 
-    def test_force_flag_uses_sigterm(self) -> None:
-        def fake_kill(pid: int, sig: int) -> None:
-            if sig == 0:
-                raise OSError("gone")
-
+    def test_sleep_fails_when_no_socket(self) -> None:
         with (
             patch("hope.daemon.core.read_pid", return_value=8080),
-            patch("hope.cli.sleep_cmd.os.kill", side_effect=fake_kill) as mock_kill,
-            patch("hope.daemon.core.clear_pid"),
+            patch(
+                "hope.daemon.core.send_control",
+                side_effect=FileNotFoundError("no socket"),
+            ),
         ):
-            result = CliRunner().invoke(cli, ["sleep", "--force"])
-        assert result.exit_code == 0, result.output
-        # At least one SIGTERM and probe call.
-        assert mock_kill.called
+            result = CliRunner().invoke(cli, ["sleep"])
+        assert result.exit_code != 0
+        assert "socket missing" in result.output.lower()

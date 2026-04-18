@@ -15,10 +15,11 @@ from hope.cli.chat_cmd import chat
 from hope.cli.compose_cmd import compose
 from hope.cli.config_cmd import config
 from hope.cli.connect_cmd import connect
-from hope.cli.daemon_cmd import restart, stop
+from hope.cli.daemon_cmd import restart
 from hope.cli.sleep_cmd import sleep as sleep_cmd
 from hope.cli.start_cmd import start
 from hope.cli.status_cmd import status
+from hope.cli.stop_cmd import stop
 from hope.cli.wake_cmd import wake as wake_cmd
 from hope.cli.deep_research_setup_cmd import deep_research_setup
 from hope.cli.digest_cmd import digest
