@@ -797,6 +797,15 @@ class HopeDaemon:
 
         Same off-thread pattern as ``pause_listening`` — clears the
         flag synchronously, restarts the STT pipeline on a worker.
+
+        Also flushes any backlog the daemon picked up before the
+        pause: queued transcripts AND any in-flight brain turn.
+        Without this, a single TV-audio dispatch from before the
+        pause keeps ``_brain_busy`` set for up to 8 minutes (the
+        BrainSession.send timeout), and every transcript the user
+        sends after un-mute gets ``[QUEUE-FULL]``-dropped instead
+        of reaching the brain. User-visible symptom: 'I un-muted
+        but nothing happens.'
         """
         if not self._listening_paused.is_set():
             return False
@@ -805,13 +814,65 @@ class HopeDaemon:
             self._bus.publish(EventType.LISTENING_RESUMED, {"timestamp": time.time()})
         except Exception:
             logger.exception("failed to publish LISTENING_RESUMED")
+        # Flush the queued-transcript backlog so old TV/podcast
+        # audio doesn't dispatch the moment STT comes back.
+        with self._pending_lock:
+            dropped = len(self._pending_transcripts)
+            self._pending_transcripts.clear()
+        if dropped:
+            logger.info(
+                "resume: dropped %d stale queued transcript(s)", dropped,
+            )
+        # Cancel any in-flight brain turn so ``_brain_busy`` clears
+        # quickly. Done off-thread so it doesn't block the control
+        # socket on tmux send-keys.
+        if self._brain_busy.is_set():
+            threading.Thread(
+                target=self._cancel_inflight_brain_silent,
+                name="hope-resume-cancel",
+                daemon=True,
+            ).start()
         threading.Thread(
             target=self._stt_resume_worker,
             name="hope-stt-resume",
             daemon=True,
         ).start()
-        logger.info("listening resumed (STT restart queued)")
+        logger.info("listening resumed (STT restart queued, backlog flushed)")
         return True
+
+    def _cancel_inflight_brain_silent(self) -> None:
+        """Like _handle_cancel_midturn but with NO TTS confirmation.
+
+        Used on resume_listening — the user already got visual
+        feedback from the un-mute toggle; an audible 'Stopped, sir.'
+        on every un-mute would be obnoxious.
+        """
+        orch = self._orchestrator
+        if orch is None:
+            return
+        main_id = getattr(orch, "hope_main_pane_id", None)
+        if not main_id:
+            return
+        try:
+            entry = orch.registry.get(main_id)
+        except Exception:
+            return
+        target = getattr(entry, "tmux_target", None) if entry else None
+        if not target:
+            return
+        try:
+            orch._tmux(  # type: ignore[attr-defined]
+                ["tmux", "send-keys", "-t", target, "C-c"], check=False,
+            )
+            time.sleep(0.1)
+            orch._tmux(  # type: ignore[attr-defined]
+                ["tmux", "send-keys", "-t", target, "C-c"], check=False,
+            )
+            logger.info("resume: Ctrl-C sent to in-flight brain turn")
+        except Exception:
+            logger.debug(
+                "resume: tmux send-keys for cancel failed", exc_info=True,
+            )
 
     def _stt_resume_worker(self) -> None:
         """Worker that brings STT back online. Best-effort."""
