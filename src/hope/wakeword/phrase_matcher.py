@@ -31,6 +31,19 @@ logger = logging.getLogger(__name__)
 _PUNCT_STRIPPER = str.maketrans("", "", string.punctuation)
 _WHITESPACE = re.compile(r"\s+")
 
+# Address-pattern fallback. Fires when an utterance OPENS with the
+# addressed name (the natural way humans talk to a named agent).
+# Optional leading attention-getter (hey/ok/alright/yo/wake up) +
+# the word "hope" + boundary. Punctuation has already been stripped
+# by ``_normalize`` so the regex only looks at lowercase words.
+# Examples that match: "hope how are you", "hey hope play music",
+# "ok hope pause it", "hope".
+# Examples that DON'T match: "i hope you", "anyone hope so",
+# "for hope and faith".
+_ADDRESS_RE = re.compile(
+    r"^(?:(?:hey|ok|okay|alright|yo|wake\s+up)\s+)?hope(?:\s|$)",
+)
+
 
 def _normalize(text: str) -> str:
     """Lowercase, strip punctuation, collapse whitespace."""
@@ -154,13 +167,26 @@ class PhraseMatcher:
     # -- matching -----------------------------------------------------------
 
     def matches(self, text: str) -> bool:
-        """True if *text* fuzzy-matches any configured wake phrase."""
+        """True if *text* fuzzy-matches any configured wake phrase OR
+        starts with the address-pattern ("Hope, ...", "Hey Hope ...",
+        "OK Hope ...").
+
+        The address pattern is the natural way humans address a named
+        agent — "Hope, what time is it?", "Hey Hope, play music".
+        Without this branch the only way to wake was an explicit
+        ``wake up hope``-style phrase, which is unnatural after the
+        first interaction.
+        """
         norm = _normalize(text)
         if not norm:
             return False
         for phrase in self._phrases:
             if _fuzzy_contains(norm, phrase, self._max_edit_distance):
                 return True
+        # Address-pattern fallback: utterance opens with an optional
+        # attention-getter then "hope" as the addressed name.
+        if _ADDRESS_RE.match(norm):
+            return True
         return False
 
     # -- event bridge -------------------------------------------------------
