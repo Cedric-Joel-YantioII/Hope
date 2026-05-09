@@ -959,7 +959,8 @@ class HopeDaemon:
         # ``_on_speech_transcript`` already does for wake-prefix
         # transcripts during pause. Only an "unknown" source (or any
         # source we explicitly want to gate) is ignored.
-        if self._listening_paused.is_set():
+        was_paused = self._listening_paused.is_set()
+        if was_paused:
             if source in ("voice", "clap", "manual"):
                 if source != "manual":
                     self.resume_listening()
@@ -967,6 +968,19 @@ class HopeDaemon:
                         "wake while paused — auto-resuming "
                         "(source=%s, deliberate user intent)",
                         source,
+                    )
+                # When the user wakes Hope after a pause, any queued
+                # transcripts are almost certainly stale background
+                # noise (TV, podcast, the conversation we were trying
+                # to filter out). Drop them so the brain doesn't
+                # process minutes-old garbage right after the wake.
+                with self._pending_lock:
+                    dropped = len(self._pending_transcripts)
+                    self._pending_transcripts.clear()
+                if dropped:
+                    logger.info(
+                        "wake-from-pause: cleared %d stale queued transcript(s)",
+                        dropped,
                     )
                 # Fall through into the wake flow.
             else:
@@ -984,8 +998,22 @@ class HopeDaemon:
         # orchestrator.start() + say() concurrently.
         with self._wake_lock:
             if bool(getattr(orch, "_started", False)):
-                # Silent — the "I'm already awake" chatter was annoying
-                # and caused more echo feedback when mic re-captured it.
+                if was_paused:
+                    # The user wasn't asleep — the daemon was just
+                    # muted. Confirm we're back so they don't talk
+                    # into a black hole. Short greeting only; the
+                    # full "Hi sir, I am online..." is reserved for
+                    # cold wakes.
+                    self._last_brain_turn_at = time.monotonic()
+                    self._speak_blocking("I'm listening.")
+                    logger.info(
+                        "wake while already-awake — un-paused with "
+                        "greeting (was muted)",
+                    )
+                    return
+                # Truly already awake and not paused — silent. The
+                # "I'm already awake" chatter was annoying and caused
+                # more echo feedback when mic re-captured it.
                 logger.info("wake ignored — already awake")
                 return
             try:
