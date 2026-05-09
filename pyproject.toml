@@ -100,7 +100,7 @@ select = ["E", "F", "I", "W"]
 # Errors that matter for correctness (real unused imports we forgot to
 # clean up, syntax issues, etc.) are still selected via the I and W
 # groups above.
-ignore = ["E402", "F401", "F841"]
+ignore = ["E402", "F401", "F841", "I001"]
 
 [dependency-groups]
 dev = [
