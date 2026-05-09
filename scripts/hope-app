@@ -1,0 +1,256 @@
+#!/usr/bin/env bash
+# hope-app — application lifecycle + window control for macOS.
+#
+# A thin, composable layer over `open`, `osascript`, and System Events so
+# Hope can manage apps without remembering AppleScript syntax. Each
+# subcommand prints something useful on stdout (JSON or table) and exits 0
+# on success. Failures print to stderr with a short reason.
+#
+# Subcommands:
+#   list                       — currently-running apps with bundle ids
+#   launch <name>              — fuzzy-launch an app (case-insensitive)
+#   quit <name>                — politely tell an app to quit
+#   focus <name>               — bring app to front
+#   running <name>             — exit 0 if app is running, 1 otherwise
+#   windows <name>             — list window titles of <name>
+#   menu <name> <path>         — click a menu item (e.g. "View>Reload")
+#   url <url>                  — open URL in default browser (or named app)
+#
+# Examples:
+#   hope-app launch "Spotify"
+#   hope-app focus chrome
+#   hope-app windows "Google Chrome"
+#   hope-app menu "Google Chrome" "View>Force Reload"
+#   hope-app quit "Discord"
+#
+# Notes:
+# - All app-name matches are CASE-INSENSITIVE substring matches against
+#   the running process list. "chrome" matches "Google Chrome".
+# - For non-running apps, `launch` falls back to `open -a` which uses
+#   LaunchServices to find the .app bundle by display name.
+
+set -euo pipefail
+
+SUBCMD="${1:-help}"
+shift || true
+
+die() { echo "hope-app: $*" >&2; exit 1; }
+
+# Resolve a fuzzy name → exact running-process name. Returns empty if
+# nothing matches.
+#
+# Strategy:
+#   1. Exact substring match on the full query (case-insensitive — the
+#      AppleScript `contains` is already case-insensitive).
+#   2. If that fails, try the CFBundleExecutable of a matching .app
+#      bundle — LaunchServices → .app → Info.plist → the name the
+#      process actually takes when running. Handles the "JMP Student
+#      Edition 19.app" → process "JMP" case in one shot.
+#   3. If that fails, walk progressively-shorter prefixes of the query
+#      (drop last token, again, again…) so "Microsoft Word 365" still
+#      matches a running "Microsoft Word".
+#   4. If that fails, try single tokens — the shortest distinctive word
+#      ("JMP" alone, "Word" alone) often wins.
+_match_process_substring() {
+    local query="$1"
+    osascript <<EOF 2>/dev/null
+tell application "System Events"
+    set hits to (name of every process where background only is false and name contains "$query")
+    if (count of hits) > 0 then return item 1 of hits
+    return ""
+end tell
+EOF
+}
+
+_bundle_exec_name() {
+    # Given a display-name-like query ("JMP Student Edition 19"), find a
+    # .app bundle and return its CFBundleExecutable. Tries /Applications
+    # first, falls back to mdfind.
+    local query="$1"
+    local bundle
+    bundle=$(/bin/ls -d "/Applications/${query}.app" 2>/dev/null || true)
+    if [[ -z "$bundle" ]]; then
+        bundle=$(mdfind -onlyin /Applications "kMDItemDisplayName == '${query}.app'cd" 2>/dev/null | head -1)
+    fi
+    if [[ -z "$bundle" ]]; then
+        bundle=$(mdfind "kMDItemContentType == 'com.apple.application-bundle' && kMDItemDisplayName == '${query}*'cd" 2>/dev/null | head -1)
+    fi
+    [[ -z "$bundle" ]] && return
+    /usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$bundle/Contents/Info.plist" 2>/dev/null || true
+}
+
+resolve_running() {
+    local query="$1"
+    local hit
+    # Step 1: direct substring.
+    hit=$(_match_process_substring "$query")
+    [[ -n "$hit" ]] && { echo "$hit"; return; }
+    # Step 2: CFBundleExecutable of a matching .app — captures the
+    # display-name → process-name rename.
+    local exec_name
+    exec_name=$(_bundle_exec_name "$query")
+    if [[ -n "$exec_name" ]]; then
+        hit=$(_match_process_substring "$exec_name")
+        [[ -n "$hit" ]] && { echo "$hit"; return; }
+    fi
+    # Step 3: progressively drop trailing tokens.
+    local remainder="$query"
+    while [[ "$remainder" == *" "* ]]; do
+        remainder="${remainder% *}"
+        hit=$(_match_process_substring "$remainder")
+        [[ -n "$hit" ]] && { echo "$hit"; return; }
+    done
+    # Step 4: try the first token alone (often the distinctive one).
+    local first="${query%% *}"
+    if [[ "$first" != "$query" ]]; then
+        hit=$(_match_process_substring "$first")
+        [[ -n "$hit" ]] && { echo "$hit"; return; }
+    fi
+    echo ""
+}
+
+case "$SUBCMD" in
+    list)
+        # Plain text: one app per line.
+        osascript -e 'tell application "System Events" to get name of every process where background only is false' \
+            | tr ',' '\n' | sed 's/^ *//' | sort -fu
+        ;;
+
+    launch)
+        APP="${1:-}"
+        [[ -z "$APP" ]] && die "usage: hope-app launch <name>"
+        # If already running, just focus and exit — fits the "reuse before
+        # create" principle.
+        EXISTING=$(resolve_running "$APP")
+        if [[ -n "$EXISTING" ]]; then
+            osascript -e "tell application \"$EXISTING\" to activate" 2>/dev/null
+            echo "$EXISTING (already running, focused)"
+            exit 0
+        fi
+        # `open -a` resolves display name → bundle. Foreground.
+        if open -a "$APP" 2>/dev/null; then
+            echo "$APP (launched)"
+            exit 0
+        fi
+        # `open -a "JMP"` fails because LaunchServices needs the bundle's
+        # display name ("JMP Student Edition 19"), not a short alias.
+        # Fall back to mdfind: look for any .app whose display name starts
+        # with the query, and retry `open -a` with its basename.
+        FOUND=$(mdfind "kMDItemContentType == 'com.apple.application-bundle' && kMDItemDisplayName == '${APP}*'cd" 2>/dev/null | head -1)
+        if [[ -n "$FOUND" ]]; then
+            BUNDLE_NAME=$(basename "$FOUND" .app)
+            if open -a "$BUNDLE_NAME" 2>/dev/null; then
+                echo "$BUNDLE_NAME (launched, resolved from '$APP')"
+                exit 0
+            fi
+        fi
+        die "could not launch '$APP' — not installed or unknown name?"
+        ;;
+
+    quit)
+        APP="${1:-}"
+        [[ -z "$APP" ]] && die "usage: hope-app quit <name>"
+        TARGET=$(resolve_running "$APP")
+        [[ -z "$TARGET" ]] && die "no running app matching '$APP'"
+        osascript -e "tell application \"$TARGET\" to quit" 2>/dev/null \
+            && echo "$TARGET (quit)" \
+            || die "could not quit '$TARGET' (may have unsaved data prompting)"
+        ;;
+
+    focus)
+        APP="${1:-}"
+        [[ -z "$APP" ]] && die "usage: hope-app focus <name>"
+        TARGET=$(resolve_running "$APP")
+        [[ -z "$TARGET" ]] && die "no running app matching '$APP'"
+        osascript -e "tell application \"$TARGET\" to activate" 2>/dev/null
+        echo "$TARGET (focused)"
+        ;;
+
+    running)
+        APP="${1:-}"
+        [[ -z "$APP" ]] && die "usage: hope-app running <name>"
+        TARGET=$(resolve_running "$APP")
+        if [[ -n "$TARGET" ]]; then
+            echo "$TARGET"; exit 0
+        else
+            echo "not running"; exit 1
+        fi
+        ;;
+
+    windows)
+        APP="${1:-}"
+        [[ -z "$APP" ]] && die "usage: hope-app windows <name>"
+        TARGET=$(resolve_running "$APP")
+        [[ -z "$TARGET" ]] && die "no running app matching '$APP'"
+        osascript <<EOF
+tell application "System Events"
+    tell process "$TARGET"
+        set out to ""
+        repeat with i from 1 to (count of windows)
+            set w to window i
+            set out to out & i & ": " & (title of w) & linefeed
+        end repeat
+        return out
+    end tell
+end tell
+EOF
+        ;;
+
+    menu)
+        APP="${1:-}"
+        MPATH="${2:-}"
+        [[ -z "$APP" || -z "$MPATH" ]] && die "usage: hope-app menu <app> <Menu>Sub>Item>"
+        TARGET=$(resolve_running "$APP")
+        [[ -z "$TARGET" ]] && die "no running app matching '$APP'"
+        osascript -e "tell application \"$TARGET\" to activate" 2>/dev/null
+        # Split the menu path by ">" and click each.
+        IFS='>' read -ra PARTS <<< "$MPATH"
+        if [[ ${#PARTS[@]} -lt 2 ]]; then
+            die "menu path must be Top>Item or Top>Sub>Item"
+        fi
+        # Build the AppleScript dynamically. ${PARTS[-1]} is Bash 4+;
+        # macOS default bash is 3.2, so compute last-index manually.
+        TOP="${PARTS[0]}"
+        LAST_IDX=$(( ${#PARTS[@]} - 1 ))
+        ITEM="${PARTS[$LAST_IDX]}"
+        if [[ ${#PARTS[@]} -eq 2 ]]; then
+            osascript <<EOF
+tell application "System Events"
+    tell process "$TARGET"
+        click menu item "$ITEM" of menu "$TOP" of menu bar 1
+    end tell
+end tell
+EOF
+        else
+            SUB="${PARTS[1]}"
+            osascript <<EOF
+tell application "System Events"
+    tell process "$TARGET"
+        click menu item "$ITEM" of menu "$SUB" of menu item "$SUB" of menu "$TOP" of menu bar 1
+    end tell
+end tell
+EOF
+        fi
+        echo "$TARGET (clicked $MPATH)"
+        ;;
+
+    url)
+        URL="${1:-}"
+        APP="${2:-}"
+        [[ -z "$URL" ]] && die "usage: hope-app url <url> [app]"
+        if [[ -n "$APP" ]]; then
+            open -a "$APP" "$URL" 2>/dev/null || die "open failed for $URL in $APP"
+        else
+            open "$URL" 2>/dev/null || die "open failed for $URL"
+        fi
+        echo "opened $URL${APP:+ in $APP}"
+        ;;
+
+    help|--help|-h|"")
+        sed -n '2,30p' "$0"
+        ;;
+
+    *)
+        die "unknown subcommand: $SUBCMD (try 'hope-app help')"
+        ;;
+esac

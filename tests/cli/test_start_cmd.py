@@ -149,14 +149,15 @@ class TestHopeDaemonIntegration:
             state = daemon.start()
             assert pid_file.exists()
             assert state.hope_main_pane_id == "hope-x"
-            # Publishing WAKE_TRIGGER when already awake -> say("I'm already awake")
-            with patch("hope.daemon.core.say") as mock_say:
+            # Publishing WAKE_TRIGGER when already awake is silent now
+            # (the "I'm already awake" chatter was removed to prevent mic
+            # echo feedback); the daemon should still not crash.
+            with patch("hope.daemon.core.say_sync") as mock_say:
                 bus.publish(
                     EventType.WAKE_TRIGGER,
                     {"source": "manual", "text": None, "timestamp": 0.0},
                 )
-                mock_say.assert_called_once()
-                assert "already awake" in mock_say.call_args.args[0].lower()
+                assert mock_say.call_count == 0
         finally:
             daemon.shutdown()
             import shutil

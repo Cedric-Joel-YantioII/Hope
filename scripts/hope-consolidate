@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# hope-consolidate — one-shot run of the nightly memory consolidator.
+#
+# Walks the last ~24 h of memories Hope wrote, asks a `claude -p`
+# subprocess to extract commitments / themes / people, writes them
+# back as structured rows in `commitments` and `consolidated` namespaces.
+#
+# Runs nightly at 02:00 via ~/Library/LaunchAgents/com.hope.consolidate.nightly.plist.
+# Can be invoked manually for testing: `hope-consolidate`.
+#
+# Logs to ~/.hope/consolidator.log. Stdout prints a one-line summary
+# ("scanned=N commitments+=X themes+=Y people+=Z").
+
+set -euo pipefail
+
+# Pinned memory DB so the consolidator reads/writes the canonical file.
+export CLAUDE_FLOW_MEMORY_DB="${CLAUDE_FLOW_MEMORY_DB:-$HOME/.hope/memory.db}"
+# Make sure claude and claude-flow are on PATH when invoked by launchd.
+export PATH="$HOME/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${PATH}"
+
+PY=/Users/joelc/Documents/Github/Hope/.venv/bin/python
+LOG=$HOME/.hope/consolidator.log
+mkdir -p "$(dirname "$LOG")"
+
+{
+    echo "[$(date -Iseconds)] start"
+    "$PY" -m hope.memory.consolidator
+    echo "[$(date -Iseconds)] end"
+} >> "$LOG" 2>&1

@@ -1,94 +1,68 @@
-import { useRef, useEffect } from 'react';
-import { Copy, Trash2 } from 'lucide-react';
-import { useAppStore } from '../lib/store';
+import { useEffect, useRef, useState } from 'react';
+import { RefreshCcw } from 'lucide-react';
+import { tailDaemonLog } from '../lib/api';
 
-const LEVEL_COLORS: Record<string, string> = {
-  info: 'var(--color-text)',
-  warn: 'var(--color-warning)',
-  error: 'var(--color-error)',
-};
-
-function formatTime(ts: number): string {
-  const d = new Date(ts);
-  return d.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
-}
-
+/**
+ * Minimal live tail of ``~/.hope/daemon.log``. The Tauri backend streams the
+ * last 32 KiB and this page polls every 1.5s while visible.
+ */
 export function LogsPage() {
-  const logEntries = useAppStore((s) => s.logEntries);
-  const clearLogs = useAppStore((s) => s.clearLogs);
+  const [body, setBody] = useState('');
+  const [error, setError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [logEntries.length]);
+    let cancelled = false;
+    const pull = async () => {
+      try {
+        const text = await tailDaemonLog(64 * 1024);
+        if (!cancelled) {
+          setBody(text);
+          setError(null);
+        }
+      } catch (e) {
+        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
+      }
+    };
+    pull();
+    const id = window.setInterval(pull, 1500);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, []);
 
-  const handleCopy = async () => {
-    const text = logEntries
-      .map((e) => `${formatTime(e.timestamp)} [${e.level}] [${e.category}] ${e.message}`)
-      .join('\n');
-    await navigator.clipboard.writeText(text);
-  };
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  }, [body]);
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden px-6 py-10">
-      <div className="max-w-4xl mx-auto w-full flex flex-col flex-1 overflow-hidden">
-        <header className="mb-6 shrink-0">
-          <div className="flex items-center justify-between gap-3">
-            <h1 className="text-lg font-semibold" style={{ color: 'var(--color-text)' }}>
-              Logs
-            </h1>
-            <div className="flex items-center gap-2">
-              <span className="text-xs" style={{ color: 'var(--color-text-tertiary)' }}>
-                {logEntries.length} entries
-              </span>
-              <button
-                onClick={handleCopy}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer"
-                style={{ background: 'var(--color-bg-secondary)', color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)' }}
-              >
-                <Copy size={12} /> Copy All
-              </button>
-              <button
-                onClick={clearLogs}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer"
-                style={{ background: 'var(--color-bg-secondary)', color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)' }}
-              >
-                <Trash2 size={12} /> Clear
-              </button>
-            </div>
-          </div>
-          <p className="text-sm mt-2 max-w-2xl" style={{ color: 'var(--color-text-secondary)' }}>
-            Recent activity — chat events, model switches, tool calls, and system messages from this session.
-          </p>
-        </header>
-
-        {/* Log entries */}
-        <div
-          className="flex-1 overflow-y-auto rounded-xl p-4 font-mono text-xs leading-relaxed"
-          style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
-        >
-          {logEntries.length === 0 ? (
-            <div className="text-center py-12" style={{ color: 'var(--color-text-tertiary)' }}>
-              No log entries yet. Logs appear as you chat, switch models, and interact with the app.
-            </div>
-          ) : (
-            logEntries.map((entry, i) => (
-              <div key={i} className="py-0.5">
-                <span style={{ color: 'var(--color-text-tertiary)' }}>{formatTime(entry.timestamp)}</span>
-                {' '}
-                <span style={{ color: LEVEL_COLORS[entry.level] || 'var(--color-text)' }}>
-                  [{entry.category}]
-                </span>
-                {' '}
-                <span style={{ color: LEVEL_COLORS[entry.level] || 'var(--color-text)' }}>
-                  {entry.message}
-                </span>
-              </div>
-            ))
-          )}
-          <div ref={bottomRef} />
+    <div className="h-full flex flex-col overflow-hidden px-5 py-4">
+      <header className="flex items-center justify-between mb-2 shrink-0">
+        <h1 className="text-sm font-semibold" style={{ color: 'var(--color-text)' }}>
+          daemon.log
+        </h1>
+        <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--color-text-tertiary)' }}>
+          <RefreshCcw size={12} /> live tail
         </div>
-      </div>
+      </header>
+
+      {error && (
+        <div
+          className="text-xs px-3 py-2 mb-2 rounded"
+          style={{ background: 'var(--color-bg-secondary)', color: 'var(--color-error, #e76f6f)' }}
+        >
+          {error}
+        </div>
+      )}
+
+      <pre
+        className="flex-1 overflow-auto rounded-md p-3 font-mono text-[11px] leading-tight whitespace-pre-wrap"
+        style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-text)' }}
+      >
+        {body || '(log file empty or not found)'}
+        <div ref={bottomRef} />
+      </pre>
     </div>
   );
 }

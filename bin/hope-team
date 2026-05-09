@@ -1,0 +1,145 @@
+#!/usr/bin/env bash
+# hope-team — spawn a coordinated squad of specialists for a single goal.
+#
+# Each squad member is a sibling tmux pane (claude / gemini / codex)
+# wired to Hope's bus. They get the same goal in their kickoff body
+# AND a roster of teammates, so they coordinate without funnelling
+# every message through the brain.
+#
+# Usage:
+#   hope-team "<goal>" <role1> [role2] [role3] ...
+#   hope-team --cli claude:frontend,backend,ci-cd "Ship signup flow with rate-limited /signup, matching React form, CI green"
+#   hope-team "Audit Hope's voice loop for security risks" security researcher
+#
+# Each role becomes one specialist. Pass --cli LIST to override the
+# default 'claude' for some roles, e.g. --cli claude:frontend,backend
+# gemini:researcher.
+#
+# Output: JSON list of {pane_id, role, cli} per spawned member.
+set -euo pipefail
+
+HOPE_ROOT="/Users/joelc/Documents/Github/Hope"
+HOPE_PY="${HOPE_ROOT}/.venv/bin/python3"
+if [[ ! -x "$HOPE_PY" ]]; then HOPE_PY="$(command -v python3)"; fi
+PYTHONPATH_EXTRA="${HOPE_ROOT}/src"
+if [[ -n "${PYTHONPATH:-}" ]]; then
+  export PYTHONPATH="${PYTHONPATH_EXTRA}:${PYTHONPATH}"
+else
+  export PYTHONPATH="${PYTHONPATH_EXTRA}"
+fi
+
+CLI_DEFAULT="claude"
+CLI_OVERRIDES=""  # format: "claude:frontend,backend gemini:researcher"
+GOAL=""
+ROLES=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --cli) CLI_OVERRIDES="$2"; shift 2 ;;
+    --cli=*) CLI_OVERRIDES="${1#*=}"; shift ;;
+    --default-cli) CLI_DEFAULT="$2"; shift 2 ;;
+    -h|--help)
+      cat <<'USAGE'
+hope-team — spawn a coordinated squad of specialists for one goal.
+
+Usage:
+  hope-team "<goal>" <role1> [role2] [role3] ...
+  hope-team --cli "claude:frontend,backend gemini:researcher" "<goal>" frontend backend researcher
+  hope-team --default-cli gemini "<goal>" researcher coder
+
+Spawns one tmux-pane CLI agent per role. Each gets the same goal +
+the team roster in its kickoff so they can hope-send each other
+without going through the brain.
+
+Output: JSON array of {pane_id, role, cli}.
+USAGE
+      exit 0 ;;
+    --) shift; break ;;
+    -*) echo "hope-team: unknown flag $1" >&2; exit 2 ;;
+    *)
+      if [[ -z "$GOAL" ]]; then
+        GOAL="$1"
+      else
+        ROLES+=("$1")
+      fi
+      shift ;;
+  esac
+done
+
+if [[ -z "$GOAL" || ${#ROLES[@]} -eq 0 ]]; then
+  echo "hope-team: need <goal> and at least one role" >&2
+  exit 2
+fi
+
+export HOPE_TEAM_GOAL="$GOAL"
+export HOPE_TEAM_ROLES="${ROLES[*]}"
+export HOPE_TEAM_CLI_DEFAULT="$CLI_DEFAULT"
+export HOPE_TEAM_CLI_OVERRIDES="$CLI_OVERRIDES"
+
+exec "$HOPE_PY" - <<'PY'
+import json, os, sys, time
+from hope.daemon.core import send_control
+
+goal = os.environ["HOPE_TEAM_GOAL"]
+roles = [r for r in os.environ.get("HOPE_TEAM_ROLES", "").split() if r]
+cli_default = os.environ.get("HOPE_TEAM_CLI_DEFAULT", "claude").strip() or "claude"
+overrides_raw = os.environ.get("HOPE_TEAM_CLI_OVERRIDES", "").strip()
+
+# Parse "claude:frontend,backend gemini:researcher" → {role: cli}
+role_cli = {}
+for chunk in overrides_raw.split():
+    if ":" not in chunk:
+        continue
+    cli, role_csv = chunk.split(":", 1)
+    for r in role_csv.split(","):
+        r = r.strip()
+        if r:
+            role_cli[r] = cli.strip()
+
+results = []
+for role in roles:
+    cli = role_cli.get(role, cli_default)
+    # Per-member task = the shared goal + their slice of it.
+    # Specialists figure out their slice based on their role
+    # (the role template already tells them what to do).
+    task = (
+        f"Team goal: {goal}. You own the {role} slice. "
+        f"Coordinate with your teammates over the bus (hope-send <pane> ...) "
+        f"as the work demands. Publish your final result on to:hope when done."
+    )
+    try:
+        resp = send_control(
+            "spawn_specialist",
+            {"role": role, "task": task, "cli": cli, "context": {"team_goal": goal, "team_roles": roles}},
+        )
+    except FileNotFoundError as exc:
+        print(f"hope-team: {exc}", file=sys.stderr); sys.exit(3)
+    if not resp.get("ok"):
+        print(f"hope-team: spawn {role} failed: {resp}", file=sys.stderr)
+        continue
+    results.append({"role": role, "cli": cli, "queued": True})
+    # Tiny gap so the orchestrator's allocate-pane-id stays distinct
+    # and roster-broadcasts arrive in order.
+    time.sleep(0.4)
+
+# Briefly poll the daemon's specialist list so we can surface real
+# pane_ids to the caller (asynchronous spawn returns just queued=True).
+deadline = time.time() + 8.0
+while time.time() < deadline:
+    listing = send_control("list_specialists", {})
+    specs = listing.get("specialists") or []
+    found_for = {s["role"] for s in specs}
+    if all(r["role"] in found_for for r in results):
+        # Map role -> first matching pane_id (ignoring duplicates).
+        for r in results:
+            for s in specs:
+                if s["role"] == r["role"] and "pane_id" not in r:
+                    r["pane_id"] = s["pane_id"]
+                    r["tmux_target"] = s["tmux_target"]
+                    break
+        break
+    time.sleep(0.4)
+
+print(json.dumps({"goal": goal, "team": results}, indent=2))
+sys.exit(0)
+PY

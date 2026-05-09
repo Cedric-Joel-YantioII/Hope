@@ -1,26 +1,8 @@
-"""MCP (Model Context Protocol) layer for Hope."""
+"""MCP namespace — reserved for the sibling-owned ``rag_server`` module.
 
-from hope.mcp.client import MCPClient
-from hope.mcp.protocol import MCPError, MCPNotification, MCPRequest, MCPResponse
-from hope.mcp.server import MCPServer
-from hope.mcp.transport import (
-    InProcessTransport,
-    MCPTransport,
-    SSETransport,
-    StdioTransport,
-    StreamableHTTPTransport,
-)
+The legacy generic MCP client/server/transport/protocol stack was removed
+during the voice-arch cleanup. Only the RAG-over-MCP server the sibling
+adds will live here.
+"""
 
-__all__ = [
-    "MCPClient",
-    "MCPError",
-    "MCPNotification",
-    "MCPRequest",
-    "MCPResponse",
-    "MCPServer",
-    "MCPTransport",
-    "InProcessTransport",
-    "SSETransport",
-    "StdioTransport",
-    "StreamableHTTPTransport",
-]
+from __future__ import annotations

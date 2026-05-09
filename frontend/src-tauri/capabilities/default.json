@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Default permissions for Hope Desktop",
+  "description": "Default permissions for Hope Desktop (wake-triggered dashboard)",
   "windows": ["main"],
   "permissions": [
     "core:default",
@@ -11,19 +11,7 @@
     "autostart:allow-enable",
     "autostart:allow-disable",
     "autostart:allow-is-enabled",
-    "updater:default",
     "process:default",
-    "shell:allow-execute",
-    "shell:allow-spawn",
-    "shell:allow-stdin-write",
-    "shell:allow-kill",
-    "shell:allow-open",
-    "dialog:allow-open",
-    {
-      "identifier": "shell:allow-execute",
-      "allow": [
-        { "name": "binaries/ollama", "sidecar": true, "args": true }
-      ]
-    }
+    "dialog:allow-open"
   ]
 }

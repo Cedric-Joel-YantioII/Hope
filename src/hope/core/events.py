@@ -31,6 +31,17 @@ class EventType(str, Enum):
     MEMORY_CONSOLIDATED = "memory_consolidated"
     AGENT_TURN_START = "agent_turn_start"
     AGENT_TURN_END = "agent_turn_end"
+    # TTS playback boundaries — published by HopeDaemon._speak_blocking so
+    # the dashboard's waveform orb knows when Hope is *actually* speaking
+    # (not just when the brain finished generating).
+    SPEAKING_STARTED = "speaking_started"
+    SPEAKING_ENDED = "speaking_ended"
+    # Mid-brain events: Hope heard something while busy.
+    BACK_CHANNEL_HEARD = "back_channel_heard"  # user affirmed/agreed/nudged
+    BRAIN_CANCELLED = "brain_cancelled"        # user said stop/cancel etc.
+    # On-demand screen-vision tick (published by `hope-see` after a
+    # successful gemma vision call). Carries `{description, prompt}`.
+    SCREEN_OBSERVED = "screen_observed"
     TELEMETRY_RECORD = "telemetry_record"
     TRACE_STEP = "trace_step"
     TRACE_COMPLETE = "trace_complete"
@@ -100,6 +111,13 @@ class EventType(str, Enum):
     #     {"source": "voice" | "clap" | "manual",
     #      "text": Optional[str], "timestamp": float}
     WAKE_TRIGGER = "wake_trigger"
+
+    # Listening pause/resume — published by HopeDaemon.pause_listening() /
+    # resume_listening(). When paused, SPEECH_TRANSCRIPT and non-manual
+    # WAKE_TRIGGER events get dropped before any handler fires. Payload:
+    #     {"timestamp": float}
+    LISTENING_PAUSED = "listening_paused"
+    LISTENING_RESUMED = "listening_resumed"
 
 
 @dataclass(slots=True)

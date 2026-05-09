@@ -1,0 +1,61 @@
+---
+name: count-words-in-a-string
+description: Use when the user asks to count words in a string, text, sentence, paragraph, or file.
+---
+
+# Count Words in a String
+
+Count the number of whitespace-separated words in a given string or file.
+
+## When to invoke
+
+Invoke when the user asks any of:
+- "count the words in ..."
+- "how many words are in ..."
+- "word count of ..."
+- "wc this string/file"
+
+## Inputs
+
+- A literal string (quoted or pasted inline), OR
+- A file path whose contents should be counted.
+
+If the input is ambiguous (e.g., could be a path or a literal), ask the user to clarify before counting.
+
+## How to perform
+
+1. **Identify the source.**
+   - Inline string → use it directly.
+   - File path → read it with the `Read` tool first.
+
+2. **Normalize and split.**
+   - Trim leading/trailing whitespace.
+   - Split on any run of whitespace (spaces, tabs, newlines).
+   - Filter out empty tokens.
+
+3. **Count tokens.** The length of the filtered list is the word count.
+
+4. **Report.** Output a single line:
+   `Word count: <N>`
+   If useful, include character count on a second line.
+
+## CLI equivalents
+
+For files, `wc -w <path>` gives the same result quickly:
+
+- Bash: `wc -w /path/to/file`
+- For a literal string: `printf '%s' "your string here" | wc -w`
+
+Prefer `wc -w` when the input is a file and you already have shell access. For inline strings provided in the conversation, count directly without spawning a subprocess.
+
+## Edge cases
+
+- Empty string → `Word count: 0`.
+- Punctuation attached to words (e.g., "hello,") counts as one word — do not strip punctuation unless the user asks.
+- Hyphenated tokens ("state-of-the-art") count as one word.
+- Contractions ("don't") count as one word.
+- Non-Latin scripts: still split on whitespace; if the user asks about CJK text where words are not whitespace-delimited, clarify that whitespace-splitting will undercount and offer character count instead.
+
+## Output format
+
+Keep it terse. Just the count, unless the user asked for more detail.

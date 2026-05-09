@@ -1,0 +1,117 @@
+#!/usr/bin/env bash
+# hope-see-recent — list, search, or retrieve recent screen captures.
+#
+# Reads the sidecar JSON files under ~/.hope/screenshots/ (created by
+# `hope-see`) and prints them in a Hope-friendly format. Use this when
+# the user references "the last screen", "what was on screen 5 minutes
+# ago", "find the screen where Spotify was open", etc.
+#
+# Usage:
+#   hope-see-recent                       # last 10, table form
+#   hope-see-recent --json                # last 10, JSON
+#   hope-see-recent --limit 25            # last 25
+#   hope-see-recent --search "spotify"    # text-match label/desc/app/title
+#   hope-see-recent --since 10m           # only entries newer than 10 minutes
+#                                         #   (s/m/h suffix; default seconds)
+#   hope-see-recent --last                # path of the most recent capture only
+#
+# Combine: hope-see-recent --search "youtube" --since 30m --limit 5
+
+set -euo pipefail
+SCREENSHOT_DIR="${HOPE_SCREENSHOT_DIR:-$HOME/.hope/screenshots}"
+
+LIMIT=10
+SEARCH=""
+SINCE=""
+JSON=0
+LAST_ONLY=0
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --limit)   shift; LIMIT="${1:-10}"; shift || true ;;
+        --search)  shift; SEARCH="${1:-}"; shift || true ;;
+        --since)   shift; SINCE="${1:-}"; shift || true ;;
+        --json)    JSON=1; shift ;;
+        --last)    LAST_ONLY=1; shift ;;
+        --help|-h) sed -n '2,18p' "$0"; exit 0 ;;
+        *) echo "hope-see-recent: unknown flag $1" >&2; exit 1 ;;
+    esac
+done
+
+# Convert --since "10m" / "2h" / "30s" / "30" to a unix-time floor.
+SINCE_TS=0
+if [[ -n "$SINCE" ]]; then
+    n="${SINCE//[!0-9]/}"
+    unit="${SINCE//[0-9]/}"
+    case "$unit" in
+        ""|s) sec="$n" ;;
+        m)    sec=$((n * 60)) ;;
+        h)    sec=$((n * 3600)) ;;
+        d)    sec=$((n * 86400)) ;;
+        *) echo "hope-see-recent: bad --since unit '$unit'" >&2; exit 1 ;;
+    esac
+    SINCE_TS=$(( $(date +%s) - sec ))
+fi
+
+if [[ ! -d "$SCREENSHOT_DIR" ]]; then
+    [[ "$JSON" == "1" ]] && echo "[]" || echo "(no captures yet)"
+    exit 0
+fi
+
+/usr/bin/python3 - "$SCREENSHOT_DIR" "$LIMIT" "$SEARCH" "$SINCE_TS" "$JSON" "$LAST_ONLY" <<'PY'
+import json, os, sys, glob
+
+screenshot_dir, limit, search, since_ts, want_json, last_only = sys.argv[1:7]
+limit = int(limit); since_ts = float(since_ts)
+want_json = want_json == "1"; last_only = last_only == "1"
+search_lower = search.lower() if search else ""
+
+entries = []
+for sc in glob.glob(os.path.join(screenshot_dir, "*.json")):
+    try:
+        with open(sc) as f:
+            data = json.load(f)
+    except Exception:
+        continue
+    if data.get("ts", 0) < since_ts:
+        continue
+    if search_lower:
+        haystack = " ".join(str(data.get(k) or "").lower()
+                            for k in ("label", "description", "frontmost_app",
+                                      "window_app", "window_title", "prompt"))
+        if search_lower not in haystack:
+            continue
+    entries.append(data)
+
+entries.sort(key=lambda d: d.get("ts", 0), reverse=True)
+entries = entries[:limit]
+
+if last_only:
+    print(entries[0]["image"] if entries else "")
+    sys.exit(0)
+
+if want_json:
+    print(json.dumps(entries, indent=2))
+    sys.exit(0)
+
+if not entries:
+    print("(no matching captures)")
+    sys.exit(0)
+
+# Pretty table: time-ago | front-app | label/description | path
+import time
+now = time.time()
+def ago(ts):
+    d = now - ts
+    if d < 60: return f"{int(d)}s"
+    if d < 3600: return f"{int(d/60)}m"
+    if d < 86400: return f"{int(d/3600)}h"
+    return f"{int(d/86400)}d"
+
+for e in entries:
+    label = e.get("label") or e.get("description") or "(no label)"
+    label = label.replace("\n", " ")[:80]
+    app = (e.get("frontmost_app") or e.get("window_app") or "?")[:24]
+    print(f"  {ago(e.get('ts',0)):>5}  [{app:24}]  {label}")
+    print(f"         {e.get('image')}")
+PY

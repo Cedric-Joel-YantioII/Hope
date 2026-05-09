@@ -32,7 +32,12 @@ def get_rust_module() -> _types.ModuleType:
     return hope_rust
 
 
-RUST_AVAILABLE: bool = True
+try:
+    import hope_rust  # type: ignore[import-untyped]  # noqa: F401
+
+    RUST_AVAILABLE: bool = True
+except ImportError:
+    RUST_AVAILABLE = False
 
 
 # ---------------------------------------------------------------------------

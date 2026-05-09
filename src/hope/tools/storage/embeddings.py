@@ -28,11 +28,11 @@ class SentenceTransformerEmbedder(Embedder):
     Parameters
     ----------
     model_name:
-        HuggingFace model identifier.  Defaults to the lightweight
-        ``all-MiniLM-L6-v2`` (384-dim, ~22 MB).
+        HuggingFace model identifier.  Defaults to
+        ``BAAI/bge-small-en-v1.5`` (384-dim, ~128 MB, beats MiniLM on MTEB).
     """
 
-    def __init__(self, model_name: str = "all-MiniLM-L6-v2") -> None:
+    def __init__(self, model_name: str = "BAAI/bge-small-en-v1.5") -> None:
         try:
             from sentence_transformers import (
                 SentenceTransformer,

@@ -1,0 +1,178 @@
+#!/usr/bin/env bash
+# hope-ask — synchronous question to a peer pane.
+#
+# Sends a bus message with a fresh correlation_id, then blocks until
+# the peer publishes a reply on the same correlation_id (or timeout).
+#
+# Usage:
+#   hope-ask <to-pane-or-role> "<question>"
+#   hope-ask backend-7a8c "What is the response shape for /signup?"
+#   hope-ask --timeout 60 frontend "Confirm the form submits to /signup"
+#
+# 'to' can be a pane id, role label, or 'broadcast'. The peer is
+# expected to reply by sending a message back on the same
+# correlation_id with topic 'to:<asker_pane>'.
+set -euo pipefail
+
+HOPE_ROOT="/Users/joelc/Documents/Github/Hope"
+HOPE_PY="${HOPE_ROOT}/.venv/bin/python3"
+if [[ ! -x "$HOPE_PY" ]]; then HOPE_PY="$(command -v python3)"; fi
+PYTHONPATH_EXTRA="${HOPE_ROOT}/src"
+if [[ -n "${PYTHONPATH:-}" ]]; then
+  export PYTHONPATH="${PYTHONPATH_EXTRA}:${PYTHONPATH}"
+else
+  export PYTHONPATH="${PYTHONPATH_EXTRA}"
+fi
+
+TIMEOUT=30
+TO=""
+QUESTION=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --timeout) TIMEOUT="$2"; shift 2 ;;
+    --timeout=*) TIMEOUT="${1#*=}"; shift ;;
+    -h|--help)
+      cat <<'USAGE'
+hope-ask — synchronous question to a peer pane via Hope's bus.
+
+Usage:
+  hope-ask [--timeout <sec>] <to-pane-or-role> "<question>"
+
+Sends a bus message with a fresh correlation_id, then blocks until
+the peer publishes a reply on that correlation_id (default 30s).
+
+The peer should reply with:
+  hope-send <asker_pane> to:<asker_pane> --corr <id> "<answer>"
+USAGE
+      exit 0 ;;
+    --) shift; break ;;
+    -*) echo "hope-ask: unknown flag $1" >&2; exit 2 ;;
+    *)
+      if [[ -z "$TO" ]]; then TO="$1"
+      elif [[ -z "$QUESTION" ]]; then QUESTION="$1"
+      else QUESTION="$QUESTION $1"
+      fi
+      shift ;;
+  esac
+done
+
+if [[ -z "$TO" || -z "$QUESTION" ]]; then
+  echo "hope-ask: need <to> and <question>" >&2
+  exit 2
+fi
+
+export HOPE_ASK_TO="$TO"
+export HOPE_ASK_QUESTION="$QUESTION"
+export HOPE_ASK_TIMEOUT="$TIMEOUT"
+
+exec "$HOPE_PY" - <<'PY'
+import json
+import os
+import socket
+import sys
+import time
+import uuid
+import sqlite3
+
+from hope.daemon.core import send_control
+
+DB_PATH = os.path.expanduser("~/.hope/agents.db")
+
+
+def _resolve_from() -> str:
+    """Same logic hope-send uses — auto-detect calling pane."""
+    tmux_pane = os.environ.get("TMUX_PANE", "").strip()
+    if not tmux_pane:
+        return "hope-main"
+    try:
+        listing = send_control("list_specialists", {})
+    except Exception:
+        return "hope-main"
+    for spec in (listing.get("specialists") or []):
+        if spec.get("tmux_target") == tmux_pane:
+            return spec.get("pane_id") or "hope-main"
+    return "hope-main"
+
+
+def _await_reply(asker: str, corr: str, deadline: float) -> dict | None:
+    """Poll agent_messages for a reply on this correlation_id.
+
+    The orchestrator persists every bus message (incl. replies) in
+    ~/.hope/agents.db.agent_messages. We poll instead of subscribing
+    so this stays a one-shot script with no long-lived listener.
+    """
+    while time.time() < deadline:
+        try:
+            with sqlite3.connect(DB_PATH) as conn:
+                cur = conn.execute(
+                    "SELECT id, agent_id, content, from_role, to_role, topic, "
+                    "created_at FROM agent_messages "
+                    "WHERE correlation_id = ? AND agent_id != ? "
+                    "ORDER BY created_at DESC LIMIT 1",
+                    (corr, asker),
+                )
+                row = cur.fetchone()
+                if row:
+                    return {
+                        "id": row[0],
+                        "from": row[1],
+                        "body": row[2],
+                        "from_role": row[3],
+                        "to_role": row[4],
+                        "topic": row[5],
+                        "ts": row[6],
+                    }
+        except sqlite3.Error:
+            pass
+        time.sleep(0.4)
+    return None
+
+
+to = os.environ["HOPE_ASK_TO"]
+question = os.environ["HOPE_ASK_QUESTION"]
+timeout = float(os.environ.get("HOPE_ASK_TIMEOUT", "30"))
+
+asker = _resolve_from()
+corr = uuid.uuid4().hex[:16]
+topic = f"to:{to}" if not to.startswith("to:") and to != "broadcast" else (
+    "broadcast" if to == "broadcast" else to
+)
+
+try:
+    send_control(
+        "send_message",
+        {
+            "from": asker,
+            "to": to,
+            "topic": topic,
+            "body": f"[ask corr={corr}] {question}",
+            "correlation_id": corr,
+        },
+    )
+except Exception as exc:
+    print(f"hope-ask: send failed: {exc}", file=sys.stderr)
+    sys.exit(3)
+
+deadline = time.time() + timeout
+reply = _await_reply(asker, corr, deadline)
+if reply is None:
+    print(json.dumps({
+        "ok": False,
+        "error": "timeout",
+        "asker": asker,
+        "corr": corr,
+        "asked": to,
+        "timeout_sec": timeout,
+    }))
+    sys.exit(1)
+
+print(json.dumps({
+    "ok": True,
+    "asker": asker,
+    "corr": corr,
+    "from": reply["from"],
+    "from_role": reply["from_role"],
+    "answer": reply["body"],
+}))
+PY

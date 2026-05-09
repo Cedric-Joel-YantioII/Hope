@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+# hope-key — keyboard input for the focused app.
+#
+# Wraps `cliclick` for keystrokes. Use this when AppleScript can't reach
+# something (games, web embeddings, fullscreen apps).
+#
+# Usage:
+#   hope-key type "some text"             # type literal text
+#   hope-key press <key> [<key2> ...]     # press one or more keys
+#   hope-key combo <modifier-chain>       # press a chord (e.g. cmd+tab)
+#
+# Key names cliclick understands:
+#   return tab esc space delete arrow-up arrow-down arrow-left arrow-right
+#   page-up page-down home end f1..f12 num-0..num-9
+#   single chars: any printable ASCII
+#
+# Modifier chains for `combo` (comma-separated):
+#   cmd+tab            → cmd-tab
+#   cmd+shift+t        → cmd-shift-t
+#   ctrl+space         → ctrl-space
+#
+# Examples:
+#   hope-key type "Bohemian Rhapsody"
+#   hope-key press return
+#   hope-key combo cmd+tab
+#   hope-key combo cmd+shift+4   # screenshot
+set -euo pipefail
+
+SUBCMD="${1:-help}"
+shift || true
+die() { echo "hope-key: $*" >&2; exit 1; }
+
+case "$SUBCMD" in
+    type)
+        TEXT="${1:-}"
+        [[ -z "$TEXT" ]] && die "usage: hope-key type <text>"
+        cliclick t:"$TEXT"
+        echo "typed: ${TEXT:0:60}"
+        ;;
+
+    press)
+        [[ $# -lt 1 ]] && die "usage: hope-key press <key> [...]"
+        for k in "$@"; do
+            cliclick kp:"$k"
+        done
+        echo "pressed: $*"
+        ;;
+
+    combo)
+        CHORD="${1:-}"
+        [[ -z "$CHORD" ]] && die "usage: hope-key combo cmd+shift+t"
+        # Normalise: split on +, last part is the key, rest are modifiers
+        IFS='+' read -ra PARTS <<< "$CHORD"
+        if [[ ${#PARTS[@]} -lt 2 ]]; then
+            die "combo needs at least one modifier and a key (e.g. cmd+tab)"
+        fi
+        KEY="${PARTS[-1]}"
+        MODS=()
+        for ((i=0; i<${#PARTS[@]}-1; i++)); do
+            case "${PARTS[$i]}" in
+                cmd|command) MODS+=(cmd) ;;
+                shift)       MODS+=(shift) ;;
+                alt|option|opt) MODS+=(alt) ;;
+                ctrl|control) MODS+=(ctrl) ;;
+                fn)          MODS+=(fn) ;;
+                *) die "unknown modifier: ${PARTS[$i]}" ;;
+            esac
+        done
+        # cliclick syntax: kd:cmd kp:key ku:cmd
+        for m in "${MODS[@]}"; do cliclick "kd:$m"; done
+        cliclick "kp:$KEY"
+        for ((i=${#MODS[@]}-1; i>=0; i--)); do cliclick "ku:${MODS[$i]}"; done
+        echo "combo: $CHORD"
+        ;;
+
+    help|--help|-h|"")
+        sed -n '2,28p' "$0"
+        ;;
+
+    *)
+        die "unknown subcommand: $SUBCMD"
+        ;;
+esac

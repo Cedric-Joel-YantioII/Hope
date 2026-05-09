@@ -255,44 +255,21 @@ def recommend_model(hw: HardwareInfo, engine: str) -> str:
     """Suggest the best Qwen3.5 model that fits the detected hardware.
 
     Uses an explicit tier table mapping available memory to model size.
-    Falls back to scanning the full catalog if the tiered model is not
-    compatible with the selected engine.
+    The legacy ``BUILTIN_MODELS`` catalog was removed during voice-arch
+    cleanup; this now operates purely off the tier table — every tiered
+    model runs on every supported engine, so no compatibility scan is
+    needed.
     """
-    from hope.intelligence.model_catalog import BUILTIN_MODELS
+    del engine  # kept for API compatibility; tiers are engine-agnostic
 
     available_gb = _available_memory_gb(hw)
     if available_gb <= 0:
         return ""
 
-    # Build a lookup for quick engine-compatibility checks
-    catalog = {spec.model_id: spec for spec in BUILTIN_MODELS}
-
-    # Try explicit tier mapping first
-    model_id = _MODEL_TIER_FALLBACK
     for max_ram, tier_model in _MODEL_TIERS:
         if available_gb <= max_ram:
-            model_id = tier_model
-            break
-
-    spec = catalog.get(model_id)
-    if spec and engine in spec.supported_engines:
-        return model_id
-
-    # Fallback: scan all Qwen3.5 models for engine compatibility
-    candidates = [
-        s
-        for s in BUILTIN_MODELS
-        if s.provider == "alibaba"
-        and s.model_id.startswith("qwen3.5:")
-        and engine in s.supported_engines
-    ]
-    candidates.sort(key=lambda s: s.parameter_count_b, reverse=True)
-    for s in candidates:
-        estimated_gb = s.parameter_count_b * 0.5 * 1.1
-        if estimated_gb <= available_gb:
-            return s.model_id
-
-    return ""
+            return tier_model
+    return _MODEL_TIER_FALLBACK
 
 
 def estimated_download_gb(parameter_count_b: float) -> float:
@@ -1194,9 +1171,24 @@ class SandboxConfig:
 class SchedulerConfig:
     """Task scheduler settings."""
 
-    enabled: bool = False
+    # Default ON — the daemon's nightly memory consolidation + hourly
+    # connector sync depend on the scheduler. Users can opt out with
+    # ``[scheduler] enabled = false``.
+    enabled: bool = True
     poll_interval: int = 60
     db_path: str = ""  # Defaults to ~/.hope/scheduler.db
+
+
+@dataclass(slots=True)
+class EvolutionConfig:
+    """Self-evolution settings.
+
+    Opt-in because the nightly cycle runs untrusted generated code in a
+    sandbox container and proposes merge branches; we don't do either
+    without explicit ``[evolution] enabled = true``.
+    """
+
+    enabled: bool = False
 
 
 @dataclass(slots=True)
@@ -1270,6 +1262,28 @@ class SpeechConfig:
     vad_threshold: float = 0.5  # silero-vad speech probability cutoff
     min_silence_ms: int = 500  # trailing silence before finalizing a segment
     input_device: Optional[str] = None  # None → system default mic
+
+
+@dataclass(slots=True)
+class DashboardConfig:
+    """Settings for the Tauri dashboard WebSocket bridge.
+
+    The bridge runs inside :class:`hope.daemon.HopeDaemon` and streams
+    EventBus events to the frontend so the wake-triggered window can
+    render live transcript / brain state / specialist pane data.
+
+    ``autolaunch`` / ``app_bundle_path`` / ``dev_fallback`` drive the
+    daemon's attempt to bring the Tauri window up automatically on
+    ``hope start`` so the user never has to launch it manually. The
+    window itself starts hidden and only surfaces on ``wake_trigger``.
+    """
+
+    enabled: bool = True
+    host: str = "127.0.0.1"
+    port: int = 8765
+    autolaunch: bool = True  # whether hope start should try to bring the UI up
+    app_bundle_path: Optional[str] = None  # override for /Applications/Hope.app
+    dev_fallback: bool = True  # if no app bundle, run `npm run tauri dev`
 
 
 @dataclass(slots=True)
@@ -1463,6 +1477,7 @@ class HopeConfig:
     security: SecurityConfig = field(default_factory=SecurityConfig)
     sandbox: SandboxConfig = field(default_factory=SandboxConfig)
     scheduler: SchedulerConfig = field(default_factory=SchedulerConfig)
+    evolution: EvolutionConfig = field(default_factory=EvolutionConfig)
     workflow: WorkflowConfig = field(default_factory=WorkflowConfig)
     sessions: SessionConfig = field(default_factory=SessionConfig)
     a2a: A2AConfig = field(default_factory=A2AConfig)
@@ -1471,6 +1486,7 @@ class HopeConfig:
     wake: WakeConfig = field(default_factory=WakeConfig)
     vision: VisionConfig = field(default_factory=VisionConfig)
     optimize: OptimizeConfig = field(default_factory=OptimizeConfig)
+    dashboard: DashboardConfig = field(default_factory=DashboardConfig)
     agent_manager: AgentManagerConfig = field(default_factory=AgentManagerConfig)
     orchestrator: OrchestratorConfig = field(default_factory=OrchestratorConfig)
     memory_files: MemoryFilesConfig = field(default_factory=MemoryFilesConfig)
@@ -1687,6 +1703,7 @@ def load_config(path: Optional[Path] = None) -> HopeConfig:
             "speech",
             "vision",
             "optimize",
+            "dashboard",
             "agent_manager",
             "orchestrator",
             "digest",

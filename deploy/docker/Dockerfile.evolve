@@ -1,0 +1,71 @@
+# Hope nightly self-evolution sandbox.
+#
+# This is NOT a full Hope replica. No microphone, no TTS/`say`, no tmux,
+# no wake-word, no audio devices. It is a voice-less code-experimentation
+# container that:
+#   - holds a writable copy of the Hope source tree (volume-mounted)
+#   - has Python 3.13, uv, git, ripgrep
+#   - installs the `dev` extra (so pytest + ruff are available)
+#   - runs a tiny healthcheck
+#
+# Usage (typical, from EvolutionRunner):
+#
+#   docker build -f deploy/docker/Dockerfile.evolve -t hope-evolve:latest .
+#   docker run --rm \
+#     --network=none \
+#     -v "$HOME/Documents/Github/Hope:/workspace:rw" \
+#     -v "$HOME/.hope/traces.db:/readonly/traces.db:ro" \
+#     hope-evolve:latest \
+#     bash -c "cd /workspace && git checkout evolve/<branch> && pytest -q"
+#
+# The runner mounts the source tree read-write (so the container commits
+# its changes back to the host branch it was started on) and mounts the
+# traces DB read-only. Network egress is disabled by default.
+
+FROM python:3.13-slim-bookworm
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    UV_SYSTEM_PYTHON=1 \
+    HOPE_EVOLVE_SANDBOX=1 \
+    HOPE_DISABLE_AUDIO=1 \
+    HOPE_DISABLE_SPEECH=1 \
+    HOPE_DISABLE_CAPTURE=1 \
+    HOPE_NO_WAKEWORD=1
+
+# System deps. No mic, no PortAudio, no espeak — deliberately missing.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        git \
+        ripgrep \
+        curl \
+        ca-certificates \
+        build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# uv for fast installs.
+RUN pip install --no-cache-dir uv==0.5.*
+
+# /workspace is where the host source tree is mounted at runtime.
+# We still pre-install deps against a sample pyproject so image build
+# doesn't depend on the mount. The runtime `uv pip install -e .[dev]`
+# in the entrypoint will sync against the actual mounted source.
+WORKDIR /workspace
+
+# A non-root user keeps file permissions sane when the mount is rw.
+RUN useradd --create-home --uid 1000 evolve && \
+    mkdir -p /workspace /readonly && \
+    chown -R evolve:evolve /workspace /readonly
+USER evolve
+
+# Minimal entry: install the mounted package in editable mode, then run
+# whatever the caller asked for (defaults to pytest).
+COPY --chown=evolve:evolve deploy/docker/evolve_entrypoint.sh /home/evolve/entrypoint.sh
+RUN chmod +x /home/evolve/entrypoint.sh
+
+# Simple healthcheck: can we import hope and run `hope --version`?
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=2 \
+    CMD python -c "import hope; print(hope.__version__)" || exit 1
+
+ENTRYPOINT ["/home/evolve/entrypoint.sh"]
+CMD ["pytest", "-q"]

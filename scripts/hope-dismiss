@@ -1,0 +1,153 @@
+#!/usr/bin/env bash
+# hope-dismiss — best-effort dismissal of blocking dialogs/sheets/tips.
+#
+# Sends a sequence of common "dismiss" gestures to the focused app's
+# front window, with a small pause + screenshot between each so the
+# caller can verify which one (if any) actually worked. Stops at the
+# first attempt that visibly changes the screen.
+#
+# Order of attempts (least invasive first):
+#   1. Escape  — closes most macOS modal sheets and tips
+#   2. cmd+W   — closes the front window (won't quit the app)
+#   3. Return  — accepts default button on a dialog (e.g. "OK", "Continue")
+#
+# Usage:
+#   hope-dismiss               # focused app
+#   hope-dismiss <app>         # focus <app> first, then dismiss
+#   hope-dismiss --no-return   # skip the Return attempt (avoid acceptance
+#                                of a destructive default action)
+#
+# Always re-verify with hope-see afterwards. This tool is intentionally
+# dumb — it does not "know" what the dialog says. Use hope-click against
+# a specific button label when you need precision.
+
+set -euo pipefail
+
+APP=""
+SKIP_RETURN=0
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --no-return) SKIP_RETURN=1; shift ;;
+        --help|-h)   sed -n '2,22p' "$0"; exit 0 ;;
+        *)           APP="$1"; shift ;;
+    esac
+done
+
+# Focus target if specified.
+if [[ -n "$APP" ]]; then
+    hope-app focus "$APP" >/dev/null 2>&1 || true
+    sleep 0.5
+fi
+
+# Track the front app's window count — the most reliable "did a dialog
+# go away?" signal. Falls back to screenshot byte-delta (1.5% threshold)
+# for cases where the dialog hides/redraws without closing a window.
+get_window_count() {
+    local app="${1:-}"
+    if [[ -n "$app" ]]; then
+        osascript -e "tell application \"System Events\" to count windows of process whose name is \"$app\"" 2>/dev/null || echo 0
+    else
+        # Aggregate all foreground processes if no app pinned.
+        osascript -e 'tell application "System Events" to count windows of every process where background only is false' 2>/dev/null \
+            | tr ',' '\n' | awk '{s+=$1} END {print s+0}'
+    fi
+}
+
+PINNED_APP="${APP:-$(osascript -e 'tell application "System Events" to name of first process whose frontmost is true' 2>/dev/null)}"
+BEFORE=$(hope-see 2>/dev/null | head -1)
+BEFORE_SIZE=$(stat -f%z "$BEFORE" 2>/dev/null || echo 0)
+BEFORE_WINS=$(get_window_count "$PINNED_APP")
+# Anchor the originals so try_attempt() can compare to the very first
+# state, not just the previous step. Catches the case where the dismiss
+# happens between attempts but the per-step delta is too small.
+ORIG_WINS="$BEFORE_WINS"
+ORIG_SIZE="$BEFORE_SIZE"
+
+try_attempt() {
+    local label="$1"
+    shift
+    "$@" >/dev/null 2>&1 || true
+    sleep 0.6
+    local after_wins
+    after_wins=$(get_window_count "$PINNED_APP")
+    if [[ "$after_wins" != "$BEFORE_WINS" ]]; then
+        local after
+        after=$(hope-see 2>/dev/null | head -1)
+        echo "$label: window count $BEFORE_WINS → $after_wins (changed)"
+        echo "after: $after"
+        exit 0
+    fi
+    local after
+    after=$(hope-see 2>/dev/null | head -1)
+    local after_size
+    after_size=$(stat -f%z "$after" 2>/dev/null || echo 0)
+    # 1.5% screenshot-bytes delta as fallback signal (dialog hide w/o close).
+    local diff=$(( BEFORE_SIZE > after_size ? BEFORE_SIZE - after_size : after_size - BEFORE_SIZE ))
+    local threshold=$(( BEFORE_SIZE * 15 / 1000 ))
+    if (( diff > threshold )); then
+        echo "$label: visible change (Δ=$diff bytes, threshold=$threshold)"
+        echo "after: $after"
+        exit 0
+    fi
+    BEFORE_SIZE="$after_size"
+    BEFORE_WINS="$after_wins"
+}
+
+try_attempt "escape"      cliclick kp:esc
+try_attempt "cmd+w"       bash -c 'cliclick kd:cmd kp:w ku:cmd'
+if [[ "$SKIP_RETURN" == "0" ]]; then
+    try_attempt "return"  cliclick kp:return
+fi
+
+# 4th attempt: enumerate front app's windows and click the close button
+# on any whose title smells like a startup/welcome/tip panel. Catches
+# non-modal floating tip windows that ignore Escape (e.g. JMP's
+# "Quick Start", Word's "What's new", etc.).
+TIP_RE='Tip|Welcome|Quick Start|What.s New|Getting Started|Onboarding|Intro'
+front_app=$(osascript -e 'tell application "System Events" to name of first process whose frontmost is true' 2>/dev/null)
+[[ -n "$front_app" ]] && [[ -n "$APP" ]] && front_app="$(hope-app running "$APP" 2>/dev/null || echo "$front_app")"
+if [[ -n "$front_app" ]]; then
+    closed=$(osascript <<EOF 2>/dev/null
+tell application "System Events"
+  tell process "$front_app"
+    set hits to (windows whose title contains "Tip" or title contains "Welcome" or title contains "Quick Start" or title contains "What" or title contains "Getting Started" or title contains "Onboarding")
+    repeat with w in hits
+      try
+        click (button 1 of w whose subrole is "AXCloseButton")
+        return name of w
+      end try
+    end repeat
+    return ""
+  end tell
+end tell
+EOF
+)
+    if [[ -n "$closed" ]]; then
+        sleep 0.6
+        after=$(hope-see 2>/dev/null | head -1)
+        echo "tip-window close: closed '$closed'"
+        echo "after: $after"
+        exit 0
+    fi
+fi
+
+# Final cumulative check vs the ORIGINAL state. Per-step delta can miss
+# a change that did happen if the system settled across attempts.
+FINAL_WINS=$(get_window_count "$PINNED_APP")
+FINAL_PATH=$(hope-see 2>/dev/null | head -1)
+FINAL_SIZE=$(stat -f%z "$FINAL_PATH" 2>/dev/null || echo 0)
+if [[ "$FINAL_WINS" != "$ORIG_WINS" ]]; then
+    echo "cumulative: window count $ORIG_WINS → $FINAL_WINS (something closed)"
+    echo "after: $FINAL_PATH"
+    exit 0
+fi
+cumdiff=$(( ORIG_SIZE > FINAL_SIZE ? ORIG_SIZE - FINAL_SIZE : FINAL_SIZE - ORIG_SIZE ))
+cumthresh=$(( ORIG_SIZE * 15 / 1000 ))
+if (( cumdiff > cumthresh )); then
+    echo "cumulative: visible change (Δ=$cumdiff bytes from start)"
+    echo "after: $FINAL_PATH"
+    exit 0
+fi
+
+echo "no visible change after escape/cmd+w/return/tip-close — dialog may need a specific hope-click"
+exit 1

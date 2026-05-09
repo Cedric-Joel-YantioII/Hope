@@ -1,61 +1,24 @@
-"""Optimization framework for Hope configuration tuning."""
+"""Optimization surface for Hope's self-learning loop.
 
-from hope.learning.optimize.config import (
-    load_benchmark_specs,
-    load_objectives,
-    load_optimize_config,
-)
-from hope.learning.optimize.llm_optimizer import LLMOptimizer
-from hope.learning.optimize.optimizer import (
-    OptimizationEngine,
-    compute_pareto_frontier,
-)
-from hope.learning.optimize.search_space import (
-    DEFAULT_SEARCH_SPACE,
-    build_search_space,
-)
-from hope.learning.optimize.store import OptimizationStore
-from hope.learning.optimize.trial_runner import (
-    BenchmarkSpec,
-    MultiBenchTrialRunner,
-    TrialRunner,
-)
-from hope.learning.optimize.types import (
-    ALL_OBJECTIVES,
-    DEFAULT_OBJECTIVES,
-    BenchmarkScore,
-    ObjectiveSpec,
-    OptimizationRun,
-    SampleScore,
-    SearchDimension,
-    SearchSpace,
-    TrialConfig,
-    TrialFeedback,
-    TrialResult,
-)
+The academic benchmark harness (optimizer.py, trial_runner.py,
+search_space.py, llm_optimizer, store, types) was removed when Hope
+pivoted from an in-process inference engine to the tmux-brain. What
+remains here is the narrow surface the voice-turn learning loop uses,
+owned by the sibling learning agent:
 
-__all__ = [
-    "ALL_OBJECTIVES",
-    "BenchmarkScore",
-    "BenchmarkSpec",
-    "DEFAULT_OBJECTIVES",
-    "DEFAULT_SEARCH_SPACE",
-    "LLMOptimizer",
-    "MultiBenchTrialRunner",
-    "ObjectiveSpec",
-    "OptimizationEngine",
-    "OptimizationRun",
-    "OptimizationStore",
-    "SampleScore",
-    "SearchDimension",
-    "SearchSpace",
-    "TrialConfig",
-    "TrialFeedback",
-    "TrialResult",
-    "TrialRunner",
-    "build_search_space",
-    "compute_pareto_frontier",
-    "load_benchmark_specs",
-    "load_objectives",
-    "load_optimize_config",
-]
+* :mod:`hope.learning.optimize.feedback` — FeedbackCollector, TraceJudge
+* :mod:`hope.learning.optimize.personal` — personal synthesizer
+"""
+
+from __future__ import annotations
+
+# Lazy re-exports so a broken submodule (e.g. the sibling branch still
+# references the deleted hope.evals backend) doesn't block the package
+# from importing.
+try:
+    from hope.learning.optimize.feedback.collector import FeedbackCollector
+    from hope.learning.optimize.feedback.judge import TraceJudge
+
+    __all__ = ["FeedbackCollector", "TraceJudge"]
+except ImportError:
+    __all__ = []

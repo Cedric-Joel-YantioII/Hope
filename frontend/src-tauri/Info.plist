@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Microphone — required so the daemon (spawned by Hope.app) can
+         access the mic for wake-word detection + speech-to-text. macOS
+         silently denies mic access if this key is missing. -->
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Hope listens for the wake word "Hope" so you can talk to her hands-free.</string>
+
+    <!-- Camera — used by hope-webcam when you ask Hope to take a look at you. -->
+    <key>NSCameraUsageDescription</key>
+    <string>Hope takes a webcam snapshot when you ask her to "see you".</string>
+
+    <!-- Screen recording — used by hope-see / hope-see-video when you ask
+         Hope to look at your screen. -->
+    <key>NSScreenCaptureUsageDescription</key>
+    <string>Hope captures your screen when you ask her to "see this" or describe what's on screen.</string>
+
+    <!-- AppleEvents — used by hope-app / hope-key / osascript paths so
+         Hope can control other Mac apps when you ask her to. -->
+    <key>NSAppleEventsUsageDescription</key>
+    <string>Hope sends Apple events to control apps you ask her to open or operate.</string>
+
+    <!-- Speech recognition — only used if Hope ever delegates to Apple's
+         on-device STT; harmless if unused. -->
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>Hope may use macOS speech recognition to transcribe what you say.</string>
+</dict>
+</plist>

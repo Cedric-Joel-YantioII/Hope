@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  com.hope.voice-bridge — launchd plist for the voice-out consumer.
+
+  Install:
+    cp deploy/launchd/com.hope.voice-bridge.plist ~/Library/LaunchAgents/
+    launchctl load -w ~/Library/LaunchAgents/com.hope.voice-bridge.plist
+
+  Unload:
+    launchctl unload -w ~/Library/LaunchAgents/com.hope.voice-bridge.plist
+
+  Foreground check:
+    launchctl list | grep com.hope.voice-bridge
+
+  The consumer is a python process that tails
+  ~/Documents/Github/Hope/.hope-io/tts-out.jsonl and speaks via Hope's
+  say_sync. KeepAlive ensures it restarts on crash; RunAtLoad means it
+  comes up on login.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.hope.voice-bridge</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/joelc/Documents/Github/Hope/.venv/bin/python3</string>
+        <string>-m</string>
+        <string>voice_bridge.tts_consumer</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/joelc/Documents/Github/Hope</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PYTHONPATH</key>
+        <string>/Users/joelc/Documents/Github/Hope/src</string>
+        <key>HOPE_VOICE</key>
+        <string>Samantha</string>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>ThrottleInterval</key>
+    <integer>5</integer>
+
+    <key>StandardOutPath</key>
+    <string>/Users/joelc/Documents/Github/Hope/logs/voice-bridge.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/joelc/Documents/Github/Hope/logs/voice-bridge.err</string>
+</dict>
+</plist>

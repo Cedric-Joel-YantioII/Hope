@@ -80,73 +80,19 @@ def _get_config() -> Any:
 
 
 def _check_engines() -> List[CheckResult]:
-    """Probe each registered engine for health."""
-    results: List[CheckResult] = []
-
-    _ensure_engines_imported()
-
-    from hope.core.registry import EngineRegistry
-    from hope.engine import _discovery
-
-    config = _get_config()
-
-    for key in sorted(EngineRegistry.keys()):
-        try:
-            engine = _discovery._make_engine(key, config)
-            if engine.health():
-                results.append(CheckResult(f"Engine: {key}", "ok", "Reachable"))
-            else:
-                results.append(CheckResult(f"Engine: {key}", "warn", "Unreachable"))
-        except Exception as exc:
-            results.append(
-                CheckResult(f"Engine: {key}", "warn", f"Unreachable ({exc})")
-            )
-
-    if not results:
-        results.append(CheckResult("Engines", "warn", "No engines registered"))
-
-    return results
+    """Probe engines — no-op after voice-arch cleanup (engine discovery removed)."""
+    return [
+        CheckResult(
+            "Engines",
+            "warn",
+            "Engine discovery was removed in the voice-arch cleanup.",
+        )
+    ]
 
 
 def _check_models() -> List[CheckResult]:
-    """List models from healthy engines."""
-    results: List[CheckResult] = []
-
-    _ensure_engines_imported()
-
-    from hope.core.registry import EngineRegistry
-    from hope.engine import _discovery
-
-    config = _get_config()
-
-    for key in sorted(EngineRegistry.keys()):
-        try:
-            engine = _discovery._make_engine(key, config)
-            if engine.health():
-                models = engine.list_models()
-                if models:
-                    model_list = ", ".join(models[:5])
-                    suffix = f" (+{len(models) - 5} more)" if len(models) > 5 else ""
-                    results.append(
-                        CheckResult(
-                            f"Models: {key}",
-                            "ok",
-                            f"{model_list}{suffix}",
-                        )
-                    )
-                else:
-                    results.append(
-                        CheckResult(
-                            f"Models: {key}",
-                            "warn",
-                            "No models available",
-                            details="Pull a model (e.g. `ollama pull qwen3.5:2b`).",
-                        )
-                    )
-        except Exception:
-            continue
-
-    return results
+    """No-op after voice-arch cleanup (engine discovery removed)."""
+    return []
 
 
 def _check_default_model() -> CheckResult:

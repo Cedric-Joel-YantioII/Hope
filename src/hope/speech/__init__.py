@@ -1,17 +1,14 @@
-"""Speech subsystem — speech-to-text and text-to-speech backends."""
+"""Speech subsystem — whisper.cpp STT only.
 
-import importlib
+Cloud STT (Deepgram, OpenAI Whisper), faster-whisper, and all of the
+TTS backends were deleted during the voice-arch cleanup. TTS now goes
+through ``hope.audio.say`` (macOS ``say``). The surviving STT stub
+registers itself via ``@SpeechRegistry.register`` on import.
+"""
 
-# Optional STT backends — each registers itself via @SpeechRegistry.register()
-for _mod in ("faster_whisper", "openai_whisper", "deepgram", "whisper_cpp"):
-    try:
-        importlib.import_module(f".{_mod}", __name__)
-    except ImportError:
-        pass
+from __future__ import annotations
 
-# Optional TTS backends — each registers itself via @TTSRegistry.register()
-for _mod in ("cartesia_tts", "kokoro_tts", "openai_tts"):
-    try:
-        importlib.import_module(f".{_mod}", __name__)
-    except ImportError:
-        pass
+try:
+    from hope.speech import whisper_cpp  # noqa: F401
+except ImportError:
+    pass

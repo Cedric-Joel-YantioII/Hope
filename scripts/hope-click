@@ -1,0 +1,103 @@
+#!/usr/bin/env bash
+# hope-click — vision-grounded mouse click.
+#
+# Two modes:
+#   1. Coordinate: hope-click 540 320       # click x=540 y=320 (logical px)
+#   2. Vision:    hope-click "the play button on YouTube"
+#                 → screencaptures, asks gemma3:4b vision to return
+#                   "<int>,<int>" coordinates of the described element,
+#                   then cliclicks them.
+#
+# Vision mode is best-effort. Gemma is good at rough quadrant-level
+# location but not pixel-precise. Tips:
+#   - Be specific: "the round red play button bottom-left of the video"
+#   - Include enough context that the model can disambiguate.
+#   - For pixel-precise clicks, use the coordinate form.
+#
+# Always verify after clicking — gemma might mis-aim. Use hope-see
+# afterwards to confirm.
+
+set -euo pipefail
+
+OLLAMA_URL="${HOPE_OLLAMA_URL:-http://localhost:11434}"
+MODEL="${HOPE_VISION_MODEL:-gemma3:4b}"
+
+die() { echo "hope-click: $*" >&2; exit 1; }
+
+# Coordinate mode
+if [[ "${1:-}" =~ ^[0-9]+$ ]] && [[ "${2:-}" =~ ^[0-9]+$ ]]; then
+    cliclick c:"$1,$2"
+    echo "clicked $1,$2"
+    exit 0
+fi
+
+DESCRIPTION="${1:-}"
+[[ -z "$DESCRIPTION" ]] && die "usage: hope-click <x> <y>  OR  hope-click \"<description>\""
+
+TMPDIR_LOCAL=$(mktemp -d -t hope-click)
+trap "rm -rf '$TMPDIR_LOCAL'" EXIT
+RAW="$TMPDIR_LOCAL/raw.png"
+SMALL="$TMPDIR_LOCAL/small.png"
+
+screencapture -x -m "$RAW" 2>/dev/null
+[[ -s "$RAW" ]] || die "screencapture failed (Screen Recording permission?)"
+
+# Read screen size BEFORE downscale so we can map gemma's normalised
+# coordinates back to logical screen pixels.
+SCREEN_W=$(sips -g pixelWidth "$RAW" 2>/dev/null | awk '/pixelWidth/ {print $2}')
+SCREEN_H=$(sips -g pixelHeight "$RAW" 2>/dev/null | awk '/pixelHeight/ {print $2}')
+[[ -z "$SCREEN_W" || -z "$SCREEN_H" ]] && die "could not determine screen size"
+
+# Downscale to 1024px max edge — keeps detail high enough for grounding.
+sips -Z 1024 "$RAW" --out "$SMALL" >/dev/null 2>&1
+SMALL_W=$(sips -g pixelWidth "$SMALL" 2>/dev/null | awk '/pixelWidth/ {print $2}')
+SMALL_H=$(sips -g pixelHeight "$SMALL" 2>/dev/null | awk '/pixelHeight/ {print $2}')
+
+# Ask gemma for normalised coordinates (0..1000) — easier for the model
+# than picking exact pixels, and we scale on our side.
+PROMPT="Locate the following UI element in this screenshot: \"$DESCRIPTION\".
+
+Reply with exactly two integers separated by a single comma, representing the
+center of the element on a 0-to-1000 grid where (0,0) is the top-left corner
+and (1000,1000) is the bottom-right. No words, no punctuation other than the
+single comma. If you cannot find the element, reply with: -1,-1"
+
+RESPONSE=$(/usr/bin/python3 - "$SMALL" "$MODEL" "$PROMPT" "$OLLAMA_URL" <<'PY'
+import base64, json, sys, urllib.request
+img_path, model, prompt, url = sys.argv[1:5]
+with open(img_path, 'rb') as f:
+    b64 = base64.b64encode(f.read()).decode('ascii')
+req = urllib.request.Request(
+    f"{url}/api/generate",
+    data=json.dumps({
+        'model': model, 'prompt': prompt, 'images': [b64], 'stream': False,
+    }).encode('utf-8'),
+    headers={'Content-Type': 'application/json'},
+)
+try:
+    print(json.loads(urllib.request.urlopen(req, timeout=120).read()).get('response','').strip())
+except Exception as e:
+    print(f"ERR: {e}", file=sys.stderr); sys.exit(1)
+PY
+)
+
+# Parse the response — strip anything that's not digits/comma/minus.
+COORDS=$(echo "$RESPONSE" | grep -oE '\-?[0-9]+,\-?[0-9]+' | head -1)
+[[ -z "$COORDS" ]] && die "vision returned no parseable coords: '$RESPONSE'"
+NX="${COORDS%,*}"
+NY="${COORDS#*,}"
+if [[ "$NX" == "-1" || "$NY" == "-1" ]]; then
+    die "vision could not locate '$DESCRIPTION'"
+fi
+
+# Map 0..1000 → screen pixels. Use the LOGICAL screen size (retina-aware).
+# Use system_profiler to get logical resolution.
+LOGICAL_W=$(osascript -e 'tell application "Finder" to get bounds of window of desktop' 2>/dev/null | awk -F', *' '{print $3}')
+LOGICAL_H=$(osascript -e 'tell application "Finder" to get bounds of window of desktop' 2>/dev/null | awk -F', *' '{print $4}')
+[[ -z "$LOGICAL_W" || -z "$LOGICAL_H" ]] && { LOGICAL_W="$SCREEN_W"; LOGICAL_H="$SCREEN_H"; }
+
+PX=$(( NX * LOGICAL_W / 1000 ))
+PY=$(( NY * LOGICAL_H / 1000 ))
+
+cliclick c:"$PX,$PY"
+echo "clicked $PX,$PY (vision: $DESCRIPTION → $NX,$NY of 1000)"

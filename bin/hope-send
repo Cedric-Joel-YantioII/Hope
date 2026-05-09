@@ -1,0 +1,141 @@
+#!/usr/bin/env bash
+# hope-send — push a bus message into a sibling specialist pane.
+#
+# Lets the brain (or any helper) feed mid-flight context to a running
+# specialist. The message is delivered as a literal text injection
+# into the specialist's pane (prefixed with "[Hope bus]") AND
+# persisted to agent_messages for replay.
+#
+# Usage:
+#   hope-send <to> <topic> "<body>"
+#   hope-send researcher-fde8 to:researcher-fde8 "Stripe sources just landed at https://..."
+#   hope-send broadcast tools:announce "all hands: dropping fresh context"
+#   echo "long body" | hope-send researcher-fde8 to:researcher-fde8 --stdin
+#
+# 'to' may be a pane id, a role label, or 'broadcast'. 'topic' is the
+# pub/sub key — canonical topics are to:<pane_id>, to:<role>,
+# broadcast, tools:request, tools:announce.
+set -euo pipefail
+
+HOPE_ROOT="/Users/joelc/Documents/Github/Hope"
+HOPE_PY="${HOPE_ROOT}/.venv/bin/python3"
+if [[ ! -x "$HOPE_PY" ]]; then
+  HOPE_PY="$(command -v python3)"
+fi
+PYTHONPATH_EXTRA="${HOPE_ROOT}/src"
+if [[ -n "${PYTHONPATH:-}" ]]; then
+  export PYTHONPATH="${PYTHONPATH_EXTRA}:${PYTHONPATH}"
+else
+  export PYTHONPATH="${PYTHONPATH_EXTRA}"
+fi
+
+USE_STDIN=0
+FROM="hope-main"
+TO=""
+TOPIC=""
+BODY_ARGS=()
+CORR=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --stdin) USE_STDIN=1; shift ;;
+    --from) FROM="$2"; shift 2 ;;
+    --corr|--correlation-id) CORR="$2"; shift 2 ;;
+    -h|--help)
+      cat <<'USAGE'
+hope-send — push a bus message into a sibling specialist pane.
+
+Usage:
+  hope-send [--from pane] [--corr id] <to> <topic> "<body>"
+  echo "body" | hope-send <to> <topic> --stdin
+
+'to'    — pane id, role label, or 'broadcast'
+'topic' — pub/sub key (e.g. 'to:<pane_id>', 'to:<role>', 'broadcast',
+          'tools:request', 'tools:announce')
+USAGE
+      exit 0 ;;
+    --) shift; break ;;
+    -*) echo "hope-send: unknown flag $1" >&2; exit 2 ;;
+    *)
+      if [[ -z "$TO" ]]; then TO="$1"
+      elif [[ -z "$TOPIC" ]]; then TOPIC="$1"
+      else BODY_ARGS+=("$1")
+      fi
+      shift ;;
+  esac
+done
+
+if [[ -z "$TO" || -z "$TOPIC" ]]; then
+  echo "hope-send: need <to> and <topic>" >&2
+  exit 2
+fi
+
+if [[ $USE_STDIN -eq 1 ]]; then
+  BODY="$(cat)"
+else
+  if [[ ${#BODY_ARGS[@]} -eq 0 ]]; then
+    echo "hope-send: no body (use --stdin or pass after to/topic)" >&2
+    exit 2
+  fi
+  BODY="${BODY_ARGS[*]}"
+fi
+
+export HOPE_SEND_FROM="$FROM"
+export HOPE_SEND_TO="$TO"
+export HOPE_SEND_TOPIC="$TOPIC"
+export HOPE_SEND_BODY="$BODY"
+export HOPE_SEND_CORR="$CORR"
+
+exec "$HOPE_PY" - <<'PY'
+import json, os, sys
+from hope.daemon.core import send_control
+
+
+def _resolve_from() -> str:
+    """Pick the right ``from`` for this hope-send call.
+
+    Priority:
+      1. Explicit --from flag (HOPE_SEND_FROM != "hope-main").
+      2. Auto-detect via $TMUX_PANE — tmux exports the running pane's
+         tmux pane id (e.g. %3) into every child shell. We map that
+         back to a Hope pane_id by asking the daemon for the live
+         specialist registry.
+      3. Fall back to "hope-main" so manual shell calls keep working.
+    """
+    explicit = os.environ.get("HOPE_SEND_FROM", "").strip()
+    if explicit and explicit != "hope-main":
+        return explicit
+    tmux_pane = os.environ.get("TMUX_PANE", "").strip()
+    if not tmux_pane:
+        return explicit or "hope-main"
+    try:
+        listing = send_control("list_specialists", {})
+    except Exception:
+        return explicit or "hope-main"
+    for spec in (listing.get("specialists") or []):
+        if spec.get("tmux_target") == tmux_pane:
+            return spec.get("pane_id") or "hope-main"
+    return explicit or "hope-main"
+
+
+payload = {
+    "from": _resolve_from(),
+    "to": os.environ.get("HOPE_SEND_TO", ""),
+    "topic": os.environ.get("HOPE_SEND_TOPIC", ""),
+    "body": os.environ.get("HOPE_SEND_BODY", ""),
+}
+corr = os.environ.get("HOPE_SEND_CORR", "").strip()
+if corr:
+    payload["correlation_id"] = corr
+
+try:
+    resp = send_control("send_message", payload)
+except FileNotFoundError as exc:
+    print(f"hope-send: {exc}", file=sys.stderr)
+    sys.exit(3)
+except Exception as exc:
+    print(f"hope-send: {exc}", file=sys.stderr)
+    sys.exit(4)
+print(json.dumps(resp))
+sys.exit(0 if resp.get("ok") else 5)
+PY

@@ -5,47 +5,23 @@ from __future__ import annotations
 import click
 
 import hope
-from hope.cli.add_cmd import add
-from hope.cli.agent_cmd import agent
-from hope.cli.ask import ask
-from hope.cli.bench_cmd import bench
-from hope.cli.channel_cmd import channel
-from hope.cli.channels_cmd import channels
-from hope.cli.chat_cmd import chat
-from hope.cli.compose_cmd import compose
 from hope.cli.config_cmd import config
 from hope.cli.connect_cmd import connect
-from hope.cli.daemon_cmd import restart
+from hope.cli.digest_cmd import digest
+from hope.cli.doctor_cmd import doctor
+from hope.cli.init_cmd import init
+from hope.cli.memory_cmd import memory
+from hope.cli.scheduler_cmd import scheduler
+from hope.cli.skill_cmd import skill
 from hope.cli.sleep_cmd import sleep as sleep_cmd
 from hope.cli.start_cmd import start
 from hope.cli.status_cmd import status
 from hope.cli.stop_cmd import stop
-from hope.cli.wake_cmd import wake as wake_cmd
-from hope.cli.deep_research_setup_cmd import deep_research_setup
-from hope.cli.digest_cmd import digest
-from hope.cli.doctor_cmd import doctor
-from hope.cli.eval_cmd import eval_group
-from hope.cli.feedback_cmd import feedback_group
-from hope.cli.gateway_cmd import gateway
-from hope.cli.host_cmd import host
-from hope.cli.init_cmd import init
-from hope.cli.memory_cmd import memory
-from hope.cli.model import model
-from hope.cli.operators_cmd import operators
-from hope.cli.optimize_cmd import optimize_group
-from hope.cli.quickstart_cmd import quickstart
-from hope.cli.registry_cmd import registry
-from hope.cli.scan_cmd import scan
-from hope.cli.scheduler_cmd import scheduler
-from hope.cli.serve import serve
-from hope.cli.skill_cmd import skill
-from hope.cli.telemetry_cmd import telemetry
-from hope.cli.tool_cmd import tool
 from hope.cli.vault_cmd import vault
-from hope.cli.workflow_cmd import workflow
+from hope.cli.wake_cmd import wake as wake_cmd
 
 
-@click.group(help="Hope — modular AI assistant backend")
+@click.group(help="Hope — local-first voice-interactive personal AI assistant")
 @click.version_option(version=hope.__version__, prog_name="hope")
 @click.option("--verbose", is_flag=True, default=False, help="Enable debug logging")
 @click.option("--quiet", is_flag=True, default=False, help="Suppress non-error output")
@@ -66,58 +42,31 @@ def cli(ctx: click.Context, verbose: bool, quiet: bool) -> None:
         check_for_updates(ctx.invoked_subcommand)
 
 
+# Core lifecycle
 cli.add_command(init, "init")
-cli.add_command(ask, "ask")
-cli.add_command(chat, "chat")
-cli.add_command(serve, "serve")
-cli.add_command(model, "model")
-cli.add_command(memory, "memory")
-cli.add_command(telemetry, "telemetry")
-cli.add_command(bench, "bench")
-cli.add_command(channel, "channel")
-cli.add_command(channels, "channels")
-cli.add_command(scheduler, "scheduler")
-cli.add_command(doctor, "doctor")
-cli.add_command(agent, "agents")
-cli.add_command(workflow, "workflow")
-cli.add_command(skill, "skill")
 cli.add_command(start, "start")
 cli.add_command(stop, "stop")
-cli.add_command(restart, "restart")
 cli.add_command(status, "status")
 cli.add_command(wake_cmd, "wake")
 cli.add_command(sleep_cmd, "sleep")
-cli.add_command(vault, "vault")
-cli.add_command(add, "add")
-cli.add_command(operators, "operators")
-cli.add_command(eval_group, "eval")
-cli.add_command(host, "host")
-cli.add_command(quickstart, "quickstart")
-cli.add_command(optimize_group, "optimize")
-cli.add_command(feedback_group, "feedback")
-cli.add_command(compose, "compose")
-cli.add_command(gateway, "gateway")
-cli.add_command(tool, "tool")
-cli.add_command(registry, "registry")
+cli.add_command(doctor, "doctor")
+
+# Configuration & credentials
 cli.add_command(config, "config")
-cli.add_command(scan, "scan")
+cli.add_command(vault, "vault")
+
+# Data / knowledge
+cli.add_command(memory, "memory")
 cli.add_command(connect, "connect")
 cli.add_command(digest, "digest")
-cli.add_command(deep_research_setup, "deep-research-setup")
-cli.add_command(deep_research_setup, "research")
+cli.add_command(skill, "skill")
+cli.add_command(scheduler, "scheduler")
 
-# Gateway CLI commands (lazy import to avoid pulling starlette)
+# Sibling-owned commands that may not exist yet
 try:
-    from hope.cli.auth_cmd import auth
+    from hope.cli.evolve_cmd import evolve
 
-    cli.add_command(auth, "auth")
-except ImportError:
-    pass
-
-try:
-    from hope.cli.tunnel_cmd import tunnel
-
-    cli.add_command(tunnel, "tunnel")
+    cli.add_command(evolve, "evolve")
 except ImportError:
     pass
 

@@ -1,15 +1,13 @@
-"""Hope — modular AI assistant backend with composable intelligence primitives."""
+"""Hope — local-first voice-interactive personal AI assistant."""
 
 from __future__ import annotations
 
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as _pkg_version
 
-from hope.sdk import Hope, HopeSystem, MemoryHandle, SystemBuilder
-
 try:
     __version__ = _pkg_version("hope")
 except PackageNotFoundError:  # pragma: no cover — uninstalled source tree
     __version__ = "0.0.0+unknown"
 
-__all__ = ["Hope", "HopeSystem", "MemoryHandle", "SystemBuilder", "__version__"]
+__all__ = ["__version__"]

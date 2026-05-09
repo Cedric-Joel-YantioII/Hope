@@ -1,0 +1,117 @@
+#!/usr/bin/env bash
+# hope-call-detect — detect whether the user is currently on a video call.
+#
+# Prints a single slug to stdout and exits 0 when a known video-call app is
+# running (and, for Slack/Discord, when a huddle/call window is open).
+# Prints nothing and exits 1 otherwise.
+#
+# Recognised slugs (exactly one of):
+#   zoom | facetime | meet | teams | webex | slack-huddle | discord-call
+#
+# DETECTION STRATEGY
+# -------------------
+# We tried three approaches and picked the most reliable one on macOS:
+#
+#   1. `lsof` filtering for AppleCamera / com.apple.camera — works in
+#      theory, but on Apple Silicon the camera service is brokered
+#      through `appleh13camerad` (or `avconferenced`) and the holding
+#      process is NOT the call app itself. False negatives are common.
+#
+#   2. `log stream --predicate 'subsystem == "com.apple.cmio"'` — most
+#      accurate, but streaming and requires extra entitlements under
+#      launchd. Too heavyweight for a single-shot check.
+#
+#   3. **Process name match + window-title / frontmost corroboration**
+#      (CHOSEN). Cheap, deterministic, needs no entitlements.
+#      - `pgrep -if` for each known call-app process name.
+#      - For Slack/Discord we additionally require the frontmost window
+#        title to contain "huddle" or "call" — that filters out
+#        "Slack is always running" noise vs. "Slack Huddle is live".
+#
+# Meet note: Google Meet is a browser tab, not a process, so a v1
+# process-based detector cannot see it reliably. We intentionally skip
+# Meet here; a future version can grep Chrome tab titles for
+# `meet.google.com`.
+#
+# Symlink install: `ln -sf $(pwd)/hope-call-detect /opt/homebrew/bin/`.
+
+set -euo pipefail
+
+# ---- Configuration --------------------------------------------------------
+
+# Each entry: "process-regex|slug"
+# pgrep -if matches the full command line, case-insensitive.
+CALL_APPS=(
+    "zoom\\.us|zoom"
+    "CptHost|zoom"                 # Zoom's meeting helper process
+    "FaceTime|facetime"
+    "Microsoft Teams|teams"
+    "Teams\\.app|teams"
+    "Webex|webex"
+    "WebexHelper|webex"
+    "Slack\\.app|slack-huddle"
+    "Discord|discord-call"
+)
+
+# ---- Helpers --------------------------------------------------------------
+
+# Get the title of window 1 for a given process name via System Events.
+# Emits empty string on any failure (missing osascript, no window, perms).
+window_title_for() {
+    local proc="$1"
+    if ! command -v osascript >/dev/null 2>&1; then
+        printf ''
+        return 0
+    fi
+    osascript -e "tell application \"System Events\" to tell process \"${proc}\" to get title of window 1" 2>/dev/null || printf ''
+}
+
+# ---- Scan ----------------------------------------------------------------
+
+matched_slug=""
+
+for entry in "${CALL_APPS[@]}"; do
+    regex="${entry%%|*}"
+    slug="${entry##*|}"
+
+    # pgrep -if matches the full command line, case-insensitive.
+    if pgrep -if "$regex" >/dev/null 2>&1; then
+        case "$slug" in
+            slack-huddle)
+                # Require a window title containing "huddle" or "call".
+                title="$(window_title_for "Slack")"
+                if [[ -z "$title" ]]; then
+                    continue
+                fi
+                lc_title="$(printf '%s' "$title" | tr '[:upper:]' '[:lower:]')"
+                if [[ "$lc_title" == *huddle* || "$lc_title" == *call* ]]; then
+                    matched_slug="$slug"
+                    break
+                fi
+                ;;
+            discord-call)
+                title="$(window_title_for "Discord")"
+                if [[ -z "$title" ]]; then
+                    continue
+                fi
+                lc_title="$(printf '%s' "$title" | tr '[:upper:]' '[:lower:]')"
+                if [[ "$lc_title" == *huddle* || "$lc_title" == *call* ]]; then
+                    matched_slug="$slug"
+                    break
+                fi
+                ;;
+            *)
+                # Zoom/FaceTime/Teams/Webex: running == active enough.
+                matched_slug="$slug"
+                break
+                ;;
+        esac
+    fi
+done
+
+if [[ -n "$matched_slug" ]]; then
+    printf '%s\n' "$matched_slug"
+    exit 0
+fi
+
+exit 1

@@ -16,5 +16,12 @@
     <true/>
     <key>com.apple.security.cs.disable-library-validation</key>
     <true/>
+    <!-- Audio + camera — paired with NSMicrophoneUsageDescription /
+         NSCameraUsageDescription in Info.plist so macOS prompts on
+         first launch instead of silently denying. -->
+    <key>com.apple.security.device.audio-input</key>
+    <true/>
+    <key>com.apple.security.device.camera</key>
+    <true/>
 </dict>
 </plist>

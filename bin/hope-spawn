@@ -1,0 +1,141 @@
+#!/usr/bin/env bash
+# hope-spawn — ask the Hope daemon to spawn a sibling tmux specialist pane.
+#
+# Use this from the brain instead of the native ``Task`` tool (which is
+# hard-blocked by ``.claude/settings.json`` because inline subagents
+# block the hope-main pane). A specialist runs as its own CLI agent
+# (claude / gemini / codex) in a sibling tmux pane and coordinates
+# through Hope's bus.
+#
+# Usage:
+#   hope-spawn <role> "<task description>"
+#   hope-spawn --cli gemini researcher "Find prior art for echo cancel"
+#   hope-spawn --cli codex coder "Refactor src/hope/voice/brain_session.py"
+#   echo "task body" | hope-spawn coder --stdin
+#
+# Spawning is async — the daemon acks immediately and the actual
+# ``pane_spawned`` event surfaces on the dashboard bus a few seconds
+# later. This script prints the daemon ack as JSON.
+set -euo pipefail
+
+HOPE_ROOT="/Users/joelc/Documents/Github/Hope"
+HOPE_PY="${HOPE_ROOT}/.venv/bin/python3"
+if [[ ! -x "$HOPE_PY" ]]; then
+  HOPE_PY="$(command -v python3)"
+fi
+
+PYTHONPATH_EXTRA="${HOPE_ROOT}/src"
+if [[ -n "${PYTHONPATH:-}" ]]; then
+  export PYTHONPATH="${PYTHONPATH_EXTRA}:${PYTHONPATH}"
+else
+  export PYTHONPATH="${PYTHONPATH_EXTRA}"
+fi
+
+USE_STDIN=0
+ROLE=""
+CLI="claude"
+TASK_ARGS=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --stdin)
+      USE_STDIN=1
+      shift
+      ;;
+    --cli)
+      CLI="$2"
+      shift 2
+      ;;
+    --cli=*)
+      CLI="${1#*=}"
+      shift
+      ;;
+    -h|--help)
+      cat <<'USAGE'
+hope-spawn — ask the Hope daemon to spawn a sibling tmux specialist pane.
+
+Usage:
+  hope-spawn [--cli claude|gemini|codex] <role> "<task description>"
+  echo "task body" | hope-spawn <role> --stdin
+
+The role is a short label (architect, coder, researcher, or any custom
+name); the daemon resolves it against src/hope/skills/roles/<role>.md
+or falls back to a generic system prompt.
+
+--cli picks the agent CLI:
+  claude  (default) — Claude Code, full Anthropic Max access
+  gemini  — Google's Gemini CLI (--yolo, auto-approve)
+  codex   — OpenAI Codex CLI
+
+Returns the daemon's JSON ack on stdout.
+USAGE
+      exit 0
+      ;;
+    --)
+      shift
+      while [[ $# -gt 0 ]]; do TASK_ARGS+=("$1"); shift; done
+      break
+      ;;
+    -*)
+      echo "hope-spawn: unknown flag $1" >&2
+      exit 2
+      ;;
+    *)
+      if [[ -z "$ROLE" ]]; then
+        ROLE="$1"
+      else
+        TASK_ARGS+=("$1")
+      fi
+      shift
+      ;;
+  esac
+done
+
+if [[ -z "$ROLE" ]]; then
+  echo "hope-spawn: missing role (try: hope-spawn researcher \"task...\")" >&2
+  exit 2
+fi
+
+if [[ $USE_STDIN -eq 1 ]]; then
+  TASK="$(cat)"
+else
+  if [[ ${#TASK_ARGS[@]} -eq 0 ]]; then
+    echo "hope-spawn: no task supplied (use --stdin or pass after the role)" >&2
+    exit 2
+  fi
+  TASK="${TASK_ARGS[*]}"
+fi
+
+export HOPE_SPAWN_ROLE="$ROLE"
+export HOPE_SPAWN_TASK="$TASK"
+export HOPE_SPAWN_CLI="$CLI"
+
+exec "$HOPE_PY" - <<'PY'
+import json
+import os
+import sys
+
+from hope.daemon.core import send_control
+
+role = os.environ.get("HOPE_SPAWN_ROLE", "").strip()
+task = os.environ.get("HOPE_SPAWN_TASK", "").strip()
+cli = os.environ.get("HOPE_SPAWN_CLI", "claude").strip().lower()
+if not role or not task:
+    print("hope-spawn: empty role/task", file=sys.stderr)
+    sys.exit(2)
+
+try:
+    resp = send_control(
+        "spawn_specialist",
+        {"role": role, "task": task, "cli": cli},
+    )
+except FileNotFoundError as exc:
+    print(f"hope-spawn: {exc}", file=sys.stderr)
+    sys.exit(3)
+except Exception as exc:
+    print(f"hope-spawn: control call failed: {exc}", file=sys.stderr)
+    sys.exit(4)
+
+print(json.dumps(resp))
+sys.exit(0 if resp.get("ok") else 5)
+PY

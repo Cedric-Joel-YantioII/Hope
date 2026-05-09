@@ -1,0 +1,149 @@
+#!/usr/bin/env bash
+# hope-talk — lifecycle controller for Hope's voice-in bridge.
+#
+# Subcommands:
+#   start   — boot the turn_loop daemon (refuses if already running)
+#   stop    — SIGTERM the running daemon and wait up to 5s
+#   status  — print pid + liveness + queue file locations
+#   tail    — follow the turn-log JSONL (or --log for the bridge log)
+#
+# The daemon writes:
+#   ~/Documents/Github/Hope/.hope-io/turn_loop.pid  — pidfile
+#   ~/Documents/Github/Hope/.hope-io/turn_loop.log  — daemon logs
+#   ~/Documents/Github/Hope/.hope-io/turns.jsonl    — per-turn trace
+#   ~/Documents/Github/Hope/.hope-io/tts-out.jsonl  — speech queue
+#
+# Requires Hope's venv python at ~/Documents/Github/Hope/.venv/bin/python.
+
+set -euo pipefail
+
+HOPE_ROOT="${HOPE_ROOT:-$HOME/Documents/Github/Hope}"
+HOPE_IO="$HOPE_ROOT/.hope-io"
+PID_FILE="$HOPE_IO/turn_loop.pid"
+LOG_FILE="$HOPE_IO/turn_loop.log"
+TURNS_FILE="$HOPE_IO/turns.jsonl"
+TTS_FILE="$HOPE_IO/tts-out.jsonl"
+PY_BIN="${HOPE_PY:-$HOPE_ROOT/.venv/bin/python}"
+
+die() { echo "hope-talk: $*" >&2; exit 1; }
+
+# Detect if the pidfile's pid is alive.
+_alive() {
+  local pid="${1:-}"
+  [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null
+}
+
+_read_pid() {
+  [[ -f "$PID_FILE" ]] || return 1
+  local pid
+  pid="$(tr -d '[:space:]' < "$PID_FILE" 2>/dev/null || true)"
+  [[ -n "$pid" ]] || return 1
+  printf '%s' "$pid"
+}
+
+cmd_start() {
+  mkdir -p "$HOPE_IO"
+  [[ -x "$PY_BIN" ]] || die "python not found at $PY_BIN (override via HOPE_PY)"
+  if pid="$(_read_pid)" && _alive "$pid"; then
+    echo "hope-talk: already running (pid=$pid)"
+    return 0
+  fi
+  # Stale pidfile → clear and proceed.
+  [[ -f "$PID_FILE" ]] && rm -f "$PID_FILE"
+
+  # Detach with nohup so the daemon survives terminal exit. stderr+stdout
+  # tee into the bridge log — the turn_loop configures its own file
+  # handler too, so this is a belt-and-suspenders capture for early
+  # bootstrap errors before logging is up.
+  cd "$HOPE_ROOT"
+  PYTHONPATH="$HOPE_ROOT/src${PYTHONPATH:+:$PYTHONPATH}" \
+    nohup "$PY_BIN" -m voice_bridge.turn_loop \
+      >> "$LOG_FILE" 2>&1 &
+  disown $! 2>/dev/null || true
+
+  # Wait up to 3s for the daemon to write its pidfile.
+  for _ in $(seq 1 30); do
+    if pid="$(_read_pid)" && _alive "$pid"; then
+      echo "hope-talk: started (pid=$pid)"
+      return 0
+    fi
+    sleep 0.1
+  done
+  die "daemon failed to start — see $LOG_FILE"
+}
+
+cmd_stop() {
+  if ! pid="$(_read_pid)"; then
+    echo "hope-talk: not running"
+    return 0
+  fi
+  if ! _alive "$pid"; then
+    rm -f "$PID_FILE"
+    echo "hope-talk: stale pidfile cleared"
+    return 0
+  fi
+  kill -TERM "$pid" 2>/dev/null || true
+  for _ in $(seq 1 50); do
+    if ! _alive "$pid"; then
+      rm -f "$PID_FILE"
+      echo "hope-talk: stopped (pid=$pid)"
+      return 0
+    fi
+    sleep 0.1
+  done
+  kill -KILL "$pid" 2>/dev/null || true
+  rm -f "$PID_FILE"
+  echo "hope-talk: force-killed (pid=$pid)"
+}
+
+cmd_status() {
+  if pid="$(_read_pid)" && _alive "$pid"; then
+    echo "running (pid=$pid)"
+  else
+    echo "stopped"
+  fi
+  echo "pid-file:   $PID_FILE"
+  echo "log-file:   $LOG_FILE"
+  echo "turns-file: $TURNS_FILE"
+  echo "tts-queue:  $TTS_FILE"
+  if [[ -f "$TURNS_FILE" ]]; then
+    local count
+    count="$(wc -l < "$TURNS_FILE" | tr -d ' ')"
+    echo "turns:      $count total"
+  fi
+}
+
+cmd_tail() {
+  local target="$TURNS_FILE"
+  if [[ "${1:-}" == "--log" ]]; then
+    target="$LOG_FILE"
+    shift || true
+  fi
+  [[ -f "$target" ]] || { touch "$target"; }
+  exec tail -F "$target"
+}
+
+usage() {
+  cat <<USAGE
+usage: hope-talk <start|stop|status|tail> [flags]
+
+  start        Boot the turn_loop daemon.
+  stop         Stop the turn_loop daemon (SIGTERM then SIGKILL).
+  status       Print pid, liveness, and queue locations.
+  tail         Follow ~/Documents/Github/Hope/.hope-io/turns.jsonl.
+  tail --log   Follow the bridge's own log instead.
+
+Environment:
+  HOPE_ROOT    Override Hope repo root (default: ~/Documents/Github/Hope).
+  HOPE_PY      Override python binary (default: Hope's venv python).
+USAGE
+}
+
+case "${1:-}" in
+  start)  shift; cmd_start "$@" ;;
+  stop)   shift; cmd_stop "$@" ;;
+  status) shift; cmd_status "$@" ;;
+  tail)   shift; cmd_tail "$@" ;;
+  -h|--help|help|"") usage ;;
+  *) usage; exit 2 ;;
+esac

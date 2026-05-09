@@ -1,0 +1,150 @@
+#!/usr/bin/env bash
+# hope-journal — inspect Hope's task memory and resume abandoned work.
+#
+# The orchestrator records every spawn in a SQLite journal that
+# survives kills AND daemon restarts. Use this to see what Hope and
+# her specialists were working on before a stop / crash.
+#
+# Usage:
+#   hope-journal                # list in_progress + abandoned
+#   hope-journal list [status]  # status = in_progress|abandoned|completed|all
+#   hope-journal show <task_id> # full record + bus history
+#   hope-journal resume <task_id> [--cli claude|gemini|codex]
+#   hope-journal cancel <task_id>
+set -euo pipefail
+
+HOPE_ROOT="/Users/joelc/Documents/Github/Hope"
+HOPE_PY="${HOPE_ROOT}/.venv/bin/python3"
+if [[ ! -x "$HOPE_PY" ]]; then HOPE_PY="$(command -v python3)"; fi
+PYTHONPATH_EXTRA="${HOPE_ROOT}/src"
+if [[ -n "${PYTHONPATH:-}" ]]; then
+  export PYTHONPATH="${PYTHONPATH_EXTRA}:${PYTHONPATH}"
+else
+  export PYTHONPATH="${PYTHONPATH_EXTRA}"
+fi
+
+CMD="${1:-list}"
+shift || true
+
+case "$CMD" in
+  list|"")
+    STATUS_FILTER="${1:-default}"
+    export HOPE_JNL_STATUS="$STATUS_FILTER"
+    exec "$HOPE_PY" - <<'PY'
+import json, os, sys, time
+from hope.daemon.core import send_control
+
+s = os.environ.get("HOPE_JNL_STATUS", "default")
+if s == "default":
+    statuses = ["in_progress", "abandoned"]
+elif s == "all":
+    statuses = ["in_progress", "abandoned", "completed", "cancelled"]
+else:
+    statuses = [s]
+
+resp = send_control("journal_query", {"statuses": statuses, "limit": 30})
+if not resp.get("ok"):
+    print(f"hope-journal: {resp.get('error')}", file=sys.stderr); sys.exit(1)
+tasks = resp.get("tasks", [])
+if not tasks:
+    print("(no tasks matching filter)")
+    sys.exit(0)
+print(f"{'TASK ID':<18} {'STATUS':<12} {'ROLE':<14} {'CLI':<8} {'AGE':<8} GOAL")
+print("-" * 100)
+now = time.time()
+for t in tasks:
+    age = max(0.0, now - float(t.get("last_update", 0)))
+    if age < 90:
+        ago = f"{int(age)}s"
+    elif age < 90 * 60:
+        ago = f"{int(age/60)}m"
+    elif age < 48 * 3600:
+        ago = f"{int(age/3600)}h"
+    else:
+        ago = f"{int(age/86400)}d"
+    goal = (t.get("goal") or "").replace("\n", " ")[:60]
+    print(
+        f"{t.get('task_id',''):<18} {t.get('status',''):<12} "
+        f"{(t.get('role') or '')[:14]:<14} {(t.get('cli') or '')[:8]:<8} "
+        f"{ago:<8} {goal}"
+    )
+PY
+    ;;
+  show)
+    if [[ $# -lt 1 ]]; then echo "hope-journal show: need task_id" >&2; exit 2; fi
+    export HOPE_JNL_TID="$1"
+    exec "$HOPE_PY" - <<'PY'
+import json, os, sys, time
+from hope.daemon.core import send_control
+tid = os.environ["HOPE_JNL_TID"]
+resp = send_control("journal_get", {"task_id": tid})
+if not resp.get("ok"):
+    print(f"hope-journal: {resp.get('error')}", file=sys.stderr); sys.exit(1)
+task = resp.get("task")
+if not task:
+    print(f"task {tid!r} not found", file=sys.stderr); sys.exit(1)
+print(json.dumps(task, indent=2, default=str))
+print("\n--- bus history ---")
+for h in resp.get("history") or []:
+    ts = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(h.get("created_at", 0)))
+    print(f"{ts} {h.get('agent_id')} -> {h.get('topic')}")
+    print(f"  {(h.get('content') or '')[:200]}")
+PY
+    ;;
+  resume)
+    if [[ $# -lt 1 ]]; then echo "hope-journal resume: need task_id" >&2; exit 2; fi
+    TID="$1"; shift || true
+    CLI=""
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --cli) CLI="$2"; shift 2 ;;
+        --cli=*) CLI="${1#*=}"; shift ;;
+        *) shift ;;
+      esac
+    done
+    export HOPE_JNL_TID="$TID"
+    export HOPE_JNL_CLI="$CLI"
+    exec "$HOPE_PY" - <<'PY'
+import json, os, sys
+from hope.daemon.core import send_control
+payload = {"task_id": os.environ["HOPE_JNL_TID"]}
+cli = os.environ.get("HOPE_JNL_CLI", "").strip()
+if cli:
+    payload["cli"] = cli
+resp = send_control("journal_resume", payload)
+print(json.dumps(resp))
+sys.exit(0 if resp.get("ok") else 1)
+PY
+    ;;
+  cancel)
+    if [[ $# -lt 1 ]]; then echo "hope-journal cancel: need task_id" >&2; exit 2; fi
+    export HOPE_JNL_TID="$1"
+    exec "$HOPE_PY" - <<'PY'
+import json, os, sys
+from hope.daemon.core import send_control
+resp = send_control("journal_cancel", {"task_id": os.environ["HOPE_JNL_TID"]})
+print(json.dumps(resp))
+sys.exit(0 if resp.get("ok") else 1)
+PY
+    ;;
+  -h|--help)
+    cat <<'USAGE'
+hope-journal — Hope's persistent task memory.
+
+Usage:
+  hope-journal                  # list in_progress + abandoned
+  hope-journal list [status]    # status = in_progress|abandoned|completed|cancelled|all
+  hope-journal show <task_id>   # full record + bus history
+  hope-journal resume <task_id> [--cli claude|gemini|codex]
+  hope-journal cancel <task_id>
+
+The journal is in ~/.hope/agents.db.task_journal — survives every
+kill, sleep, and stop. The brain gets a wake-up briefing of
+unfinished tasks on every WAKE_TRIGGER.
+USAGE
+    ;;
+  *)
+    echo "hope-journal: unknown subcommand '$CMD' (try list | show | resume | cancel)" >&2
+    exit 2
+    ;;
+esac

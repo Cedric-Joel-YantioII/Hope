@@ -1,0 +1,187 @@
+#!/usr/bin/env bash
+# hope-see — capture-and-optionally-describe screen vision for Hope.
+#
+# DEFAULT mode (no --describe): grab a screen, downsize it, persist to
+# ~/.hope/screenshots/, print the path. Hope's brain can then `Read` that
+# image directly — no LLM-vision call. This is the cheap path: <1s.
+#
+# --describe mode: ALSO run gemma3:4b vision and print/save the
+# description. Use only when you need a one-line summary instead of (or
+# in addition to) feeding the image to your own multimodal context.
+#
+# --window <app>: capture just that app's front window (smaller, less noise).
+#
+# Every capture writes a sidecar `<basename>.json` with:
+#   { ts, prompt, label, description, window_app, window_title, dims }
+# These sidecars are what `hope-see-recent` searches.
+#
+# Auto-prune: after each capture, if the directory has more than
+# HOPE_SCREENSHOT_MAX entries (default 200), the oldest are deleted.
+#
+# Usage:
+#   hope-see                                 # capture + return path
+#   hope-see --describe                      # capture + gemma describe + path
+#   hope-see --describe "is the song playing?"   # custom prompt for gemma
+#   hope-see --window "JMP Student Edition 19"   # capture one app
+#   hope-see --label "after-clicking-play"   # add a searchable tag
+set -euo pipefail
+
+OLLAMA_URL="${HOPE_OLLAMA_URL:-http://localhost:11434}"
+MODEL="${HOPE_VISION_MODEL:-gemma3:4b}"
+MAX_DIM="${HOPE_VISION_MAX_DIM:-1024}"
+SCREENSHOT_DIR="${HOPE_SCREENSHOT_DIR:-$HOME/.hope/screenshots}"
+SCREENSHOT_MAX="${HOPE_SCREENSHOT_MAX:-200}"
+PROMPT_DEFAULT="In one or two short sentences, describe what's on this screen — what app is open, what content is visible, what the user appears to be doing."
+
+WINDOW_APP=""
+DESCRIBE=0
+PROMPT="$PROMPT_DEFAULT"
+LABEL=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --window)         shift; WINDOW_APP="${1:-}"; shift || true ;;
+        --label)          shift; LABEL="${1:-}"; shift || true ;;
+        --describe)
+            DESCRIBE=1
+            shift
+            # Optional positional after --describe is the prompt
+            if [[ $# -gt 0 && "${1:0:2}" != "--" ]]; then
+                PROMPT="$*"; break
+            fi
+            ;;
+        --help|-h)
+            sed -n '2,28p' "$0"; exit 0 ;;
+        *)
+            # Bare positional: treat as label/prompt for the describe path
+            PROMPT="$*"; DESCRIBE=1; break ;;
+    esac
+done
+
+mkdir -p "$SCREENSHOT_DIR"
+TS=$(date +%Y%m%d_%H%M%S)_$$
+# Two artifacts are kept: the original full-resolution capture (for
+# detailed reads by Hope's multimodal context) and a downsized copy
+# (fast for Claude context + dashboard previews). Both persist to disk;
+# the sidecar references both paths so callers and future lifecycle
+# jobs can pick whichever they need.
+RAW="$SCREENSHOT_DIR/${TS}_full.png"
+SMALL="$SCREENSHOT_DIR/${TS}.png"
+SIDECAR="$SCREENSHOT_DIR/${TS}.json"
+
+WINDOW_TITLE=""
+if [[ -n "$WINDOW_APP" ]]; then
+    WIN_ID=$(osascript -e "tell application \"System Events\" to id of front window of process \"$WINDOW_APP\"" 2>/dev/null || true)
+    if [[ -z "$WIN_ID" ]]; then
+        echo "hope-see: could not find front window for app '$WINDOW_APP'" >&2
+        exit 2
+    fi
+    WINDOW_TITLE=$(osascript -e "tell application \"System Events\" to name of front window of process \"$WINDOW_APP\"" 2>/dev/null || true)
+    screencapture -x -l "$WIN_ID" "$RAW" 2>/dev/null
+else
+    screencapture -x -m "$RAW" 2>/dev/null
+fi
+
+[[ -s "$RAW" ]] || { echo "hope-see: capture failed (Screen Recording permission?)" >&2; exit 3; }
+
+# Detect the frontmost app for metadata.
+FRONT_APP=$(osascript -e 'tell application "System Events" to name of first process whose frontmost is true' 2>/dev/null || echo "")
+
+RAW_DIMS=$(sips -g pixelWidth -g pixelHeight "$RAW" 2>/dev/null | awk '/pixelWidth/ {w=$2} /pixelHeight/ {h=$2} END {print w"x"h}')
+RAW_SIZE=$(stat -f%z "$RAW" 2>/dev/null || echo 0)
+# Derive a downsized preview for quick reads / dashboard. Full-res RAW
+# is preserved — DO NOT delete it. A later lifecycle job handles
+# embedding + pruning on its own schedule.
+sips -Z "$MAX_DIM" "$RAW" --out "$SMALL" >/dev/null 2>&1
+DIMS=$(sips -g pixelWidth -g pixelHeight "$SMALL" 2>/dev/null | awk '/pixelWidth/ {w=$2} /pixelHeight/ {h=$2} END {print w"x"h}')
+
+DESCRIPTION=""
+if [[ "$DESCRIBE" == "1" ]]; then
+    DESCRIPTION=$(/usr/bin/python3 - "$SMALL" "$MODEL" "$PROMPT" "$OLLAMA_URL" <<'PY'
+import base64, json, sys, urllib.request
+img_path, model, prompt, url = sys.argv[1:5]
+with open(img_path, 'rb') as f:
+    b64 = base64.b64encode(f.read()).decode('ascii')
+req = urllib.request.Request(
+    f"{url}/api/generate",
+    data=json.dumps({'model': model, 'prompt': prompt, 'images': [b64], 'stream': False}).encode('utf-8'),
+    headers={'Content-Type': 'application/json'},
+)
+try:
+    print(json.loads(urllib.request.urlopen(req, timeout=120).read()).get('response','').strip())
+except Exception as e:
+    print(f"hope-see: ollama request failed: {e}", file=sys.stderr); sys.exit(1)
+PY
+)
+fi
+
+# Sidecar — always written, even if no description. Built in Python so
+# the JSON is well-formed regardless of label/desc content. Records both
+# artifacts (full-res RAW + downsized preview) so future lifecycle jobs
+# can pick which to embed / vectorize / prune.
+/usr/bin/python3 - "$SIDECAR" "$SMALL" "$RAW" "$LABEL" "$DESCRIPTION" "$PROMPT" "$WINDOW_APP" "$WINDOW_TITLE" "$FRONT_APP" "$DIMS" "$RAW_DIMS" "$RAW_SIZE" "$DESCRIBE" <<'PY'
+import json, sys, time, os
+(sidecar, small, raw, label, desc, prompt, win_app, win_title, front_app,
+ dims_small, dims_raw, raw_size, described) = sys.argv[1:14]
+data = {
+    "ts": time.time(),
+    "iso": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+    "image": small,              # downsized preview (fast to Read)
+    "image_full": raw,           # full-res capture (detail reads + future embed)
+    "label": label,
+    "described": described == "1",
+    "description": desc if described == "1" else None,
+    "prompt": prompt if described == "1" else None,
+    "window_app": win_app or None,
+    "window_title": win_title or None,
+    "frontmost_app": front_app or None,
+    "dims": dims_small,
+    "dims_full": dims_raw,
+    "size_bytes": os.path.getsize(small),
+    "size_bytes_full": int(raw_size) if raw_size.isdigit() else None,
+    "embedded": False,           # flipped true by the lifecycle job
+    "compressed": False,         # flipped true after RAW is converted to webp/heic
+}
+with open(sidecar, "w") as f:
+    json.dump(data, f, indent=2)
+PY
+
+# Auto-prune: keep last $SCREENSHOT_MAX preview PNGs. Each capture is
+# a triple: the preview (.png), the full-res (*_full.png), and the
+# sidecar (.json). When we prune a preview, remove the other two too.
+# Long-term: a lifecycle job (run hourly) will embed old full-res
+# images, compress them to webp, and drop the original — `hope-see`
+# just enforces a hard cap so the folder doesn't grow unbounded.
+COUNT=$(ls -1 "$SCREENSHOT_DIR"/[0-9]*_[0-9]*.png 2>/dev/null \
+        | grep -v "_full.png$" | wc -l | tr -d ' ')
+if [[ "$COUNT" -gt "$SCREENSHOT_MAX" ]]; then
+    EXCESS=$((COUNT - SCREENSHOT_MAX))
+    /bin/ls -1t "$SCREENSHOT_DIR"/[0-9]*_[0-9]*.png 2>/dev/null \
+      | grep -v "_full.png$" | tail -n "$EXCESS" | while read -r oldpng; do
+        base="${oldpng%.png}"
+        rm -f "$oldpng" "${base}_full.png" "${base}.json"
+    done
+fi
+
+# Best-effort: emit a SCREEN_OBSERVED event onto Hope's bus for the dashboard.
+HOPE_BIN="${HOPE_PY:-/Users/joelc/Documents/Github/Hope/.venv/bin/python}"
+if [[ -x "$HOPE_BIN" ]]; then
+    "$HOPE_BIN" - "$SMALL" "$DESCRIPTION" "$LABEL" "$FRONT_APP" <<'PY' 2>/dev/null || true
+import sys
+img, desc, label, app = sys.argv[1:5]
+try:
+    from hope.core.events import EventType, get_event_bus
+    bus = get_event_bus()
+    et = EventType.SCREEN_OBSERVED if hasattr(EventType, 'SCREEN_OBSERVED') else 'screen_observed'
+    bus.publish(et, {'image': img, 'description': desc or None,
+                     'label': label or None, 'frontmost_app': app or None})
+except Exception:
+    pass
+PY
+fi
+
+# Stdout: path on first line, description on second line if any. The
+# trailing `|| true` keeps the exit code 0 even when DESCRIPTION is empty
+# (bash's `[[ -n "" ]]` returns 1 and would otherwise become our exit code).
+echo "$SMALL"
+{ [[ -n "$DESCRIPTION" ]] && echo "$DESCRIPTION"; } || true

@@ -1,7 +1,7 @@
 """Always-on, on-device STT using distil-large-v3.5 via faster-whisper.
 
-The backend is named ``whisper-cpp`` for brand parity with the upstream
-OpenJarvis config surface, but under the hood it uses the CTranslate2
+The backend is named ``whisper-cpp`` for legacy-config parity, but under
+the hood it uses the CTranslate2
 faster-whisper runtime, which gives us Q5-equivalent int8 quantization
 with zero extra native deps on Apple Silicon. Anywhere in config where
 ``whisper-cpp`` appears, we load the ``distil-whisper/distil-large-v3.5``
@@ -254,6 +254,12 @@ class WhisperCppSTT(SpeechBackend):
             return
 
         text = result.text.strip()
+        logger.info(
+            "whisper-cpp segment: duration=%.2fs text=%r conf=%.2f",
+            duration_s,
+            text[:160],
+            getattr(result, "confidence", 0.0),
+        )
         if not text:
             return  # VAD triggered on non-speech; nothing to publish.
 

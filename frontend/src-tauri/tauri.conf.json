@@ -5,7 +5,7 @@
   "identifier": "com.hope.desktop",
   "build": {
     "frontendDist": "../dist",
-    "devUrl": "http://localhost:5173",
+    "devUrl": "http://localhost:5178",
     "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "npm run build:tauri"
   },
@@ -13,14 +13,17 @@
     "windows": [
       {
         "title": "Hope",
-        "width": 1280,
-        "height": 800,
-        "minWidth": 900,
-        "minHeight": 600,
+        "width": 1100,
+        "height": 720,
+        "minWidth": 800,
+        "minHeight": 560,
         "resizable": true,
         "fullscreen": false,
         "decorations": true,
-        "transparent": false
+        "transparent": false,
+        "visible": true,
+        "skipTaskbar": false,
+        "focus": true
       }
     ],
     "security": {

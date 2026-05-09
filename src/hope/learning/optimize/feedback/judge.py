@@ -4,12 +4,31 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import List, Tuple
+from typing import List, Protocol, Tuple
 
 from hope.core.types import Trace
-from hope.evals.core.backend import InferenceBackend
 
 LOGGER = logging.getLogger(__name__)
+
+
+class InferenceBackend(Protocol):
+    """Minimal protocol for a text-generation backend.
+
+    Inlined here so the feedback pipeline doesn't depend on the retired
+    ``hope.evals`` module. Any object with a compatible ``generate()``
+    will work (e.g. an Anthropic client wrapper, a local Ollama
+    wrapper, or a mock in tests).
+    """
+
+    def generate(
+        self,
+        prompt: str,
+        *,
+        model: str,
+        system: str = "",
+        temperature: float = 0.0,
+        max_tokens: int = 1024,
+    ) -> str: ...
 
 _SYSTEM_PROMPT = (
     "You are an expert evaluator of AI assistant traces. "

@@ -1,4 +1,15 @@
-"""Agents primitive — multi-turn reasoning and tool use."""
+"""Agents primitive — specialist agents spawned by the voice daemon.
+
+After the voice-arch cleanup the agent roster is lean:
+
+- Persistent specialists (tmux_orchestrator, specialist_registry)
+- Reference patterns kept as spawnable specialists:
+  ``rlm``, ``rlm_repl``, ``monitor_operative``, ``deep_research``,
+  ``morning_digest``, ``digest_store``.
+
+All registry-populating imports below are wrapped in try/except so the
+package still loads if a particular agent's optional deps are missing.
+"""
 
 from __future__ import annotations
 
@@ -14,78 +25,16 @@ from hope.agents._stubs import (
 logger = logging.getLogger(__name__)
 
 # Import agent modules to trigger @AgentRegistry.register() decorators
-try:
-    import hope.agents.simple  # noqa: F401
-except ImportError:
-    pass
-
-try:
-    import hope.agents.orchestrator  # noqa: F401
-except ImportError:
-    pass
-
-try:
-    import hope.agents.native_react  # noqa: F401
-except ImportError:
-    pass
-
-try:
-    import hope.agents.native_openhands  # noqa: F401
-except ImportError:
-    pass
-
-try:
-    import hope.agents.react  # noqa: F401 -- backward-compat shim
-except ImportError:
-    pass
-
-try:
-    import hope.agents.openhands  # noqa: F401
-except ImportError:
-    pass
-
-try:
-    import hope.agents.rlm  # noqa: F401
-except ImportError:
-    pass
-
-try:
-    import hope.agents.claude_code  # noqa: F401
-except ImportError:
-    pass
-
-try:
-    import hope.agents.operative  # noqa: F401
-except ImportError:
-    pass
-
-try:
-    import hope.agents.monitor  # noqa: F401
-except ImportError:
-    pass
-
-try:
-    import hope.agents.monitor_operative  # noqa: F401
-except ImportError:
-    pass
-
-try:
-    import hope.agents.deep_research  # noqa: F401
-except ImportError:
-    pass
-
-try:
-    import hope.agents.morning_digest  # noqa: F401
-except ImportError:
-    pass
-
-# Registry alias: "react" -> NativeReActAgent (for backward compat)
-try:
-    from hope.core.registry import AgentRegistry
-
-    if AgentRegistry.contains("native_react") and not AgentRegistry.contains("react"):
-        AgentRegistry.register_value("react", AgentRegistry.get("native_react"))
-except Exception as exc:
-    logger.debug("Registry alias 'react' creation skipped: %s", exc)
+for _mod in (
+    "hope.agents.rlm",
+    "hope.agents.rlm_repl",
+    "hope.agents.monitor_operative",
+    "hope.agents.deep_research",
+    "hope.agents.morning_digest",
+):
+    try:
+        __import__(_mod)
+    except ImportError as _exc:
+        logger.debug("Optional agent %s not loaded: %s", _mod, _exc)
 
 __all__ = ["AgentContext", "AgentResult", "BaseAgent", "ToolUsingAgent"]

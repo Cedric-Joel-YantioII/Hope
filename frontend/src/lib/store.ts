@@ -1,481 +1,256 @@
 import { create } from 'zustand';
 import type {
-  Conversation,
-  ChatMessage,
-  LogEntry,
-  ModelInfo,
-  MessageTelemetry,
-  SavingsData,
-  ServerInfo,
-  StreamState,
-  ToolCallInfo,
-  TokenUsage,
+  BrainState,
+  BridgeEvent,
+  EchoGuardState,
+  MemoryEntry,
+  SpecialistPane,
+  TranscriptLine,
 } from '../types';
-import type { ManagedAgent } from './api';
 
-export interface CachedConnector {
-  connector_id: string;
-  display_name: string;
-  connected: boolean;
-  chunks: number;
-}
+const MAX_TRANSCRIPT = 64;
+const MAX_MEMORY = 20;
 
-export interface AgentEvent {
-  type: string;
-  timestamp: number;
-  data: Record<string, unknown>;
-}
-
-// ── localStorage persistence ──────────────────────────────────────────
-
-const CONVERSATIONS_KEY = 'hope-conversations';
-const SETTINGS_KEY = 'hope-settings';
-const OPTIN_KEY = 'hope-optin';
-const OPTIN_NAME_KEY = 'hope-display-name';
-const OPTIN_EMAIL_KEY = 'hope-email';
-const OPTIN_ANONID_KEY = 'hope-anon-id';
-const OPTIN_SEEN_KEY = 'hope-optin-seen';
-
-interface ConversationStore {
-  version: 1;
-  conversations: Record<string, Conversation>;
-  activeId: string | null;
-}
-
-function generateId(): string {
+function uid(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
 
-function loadConversations(): ConversationStore {
-  try {
-    const raw = localStorage.getItem(CONVERSATIONS_KEY);
-    if (!raw) return { version: 1, conversations: {}, activeId: null };
-    const parsed = JSON.parse(raw);
-    if (parsed.version === 1) return parsed;
-    return { version: 1, conversations: {}, activeId: null };
-  } catch {
-    return { version: 1, conversations: {}, activeId: null };
-  }
+function pushCapped<T>(arr: T[], item: T, max: number): T[] {
+  const next = [...arr, item];
+  if (next.length <= max) return next;
+  return next.slice(next.length - max);
 }
 
-function saveConversations(store: ConversationStore): void {
-  localStorage.setItem(CONVERSATIONS_KEY, JSON.stringify(store));
+interface DashboardStore {
+  bridgeConnected: boolean;
+  bridgeError: string | null;
+
+  brainState: BrainState;
+  brainMainPaneId: string | null;
+  lastWake: { source: string; timestamp: number } | null;
+  lastSleep: number | null;
+
+  transcripts: TranscriptLine[];
+  specialists: SpecialistPane[];
+  memory: MemoryEntry[];
+  echo: EchoGuardState;
+
+  ragLastSync: number | null;
+  ragInFlight: number;
+
+  listeningPaused: boolean;
+
+  ingest: (event: BridgeEvent) => void;
+  setBridgeStatus: (connected: boolean, error?: string | null) => void;
+  clearTranscripts: () => void;
+  setBrainState: (state: BrainState) => void;
+  setListeningPaused: (paused: boolean) => void;
 }
 
-export type ThemeMode = 'light' | 'dark' | 'system';
+export const useDashboardStore = create<DashboardStore>((set) => ({
+  bridgeConnected: false,
+  bridgeError: null,
 
-interface Settings {
-  theme: ThemeMode;
-  apiUrl: string;
-  fontSize: 'small' | 'default' | 'large';
-  defaultModel: string;
-  defaultAgent: string;
-  temperature: number;
-  maxTokens: number;
-  speechEnabled: boolean;
-}
+  brainState: 'sleeping',
+  brainMainPaneId: null,
+  lastWake: null,
+  lastSleep: null,
 
-function loadSettings(): Settings {
-  const defaults: Settings = {
-    theme: 'system',
-    apiUrl: '',
-    fontSize: 'default',
-    defaultModel: '',
-    defaultAgent: '',
-    temperature: 0.7,
-    maxTokens: 4096,
-    speechEnabled: false,
-  };
-  try {
-    const raw = localStorage.getItem(SETTINGS_KEY);
-    if (!raw) return defaults;
-    return { ...defaults, ...JSON.parse(raw) };
-  } catch {
-    return defaults;
-  }
-}
+  transcripts: [],
+  specialists: [],
+  memory: [],
+  echo: { speaking: false, echoWindowSize: 0, brainBusy: false },
 
-function saveSettings(settings: Settings): void {
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-}
+  ragLastSync: null,
+  ragInFlight: 0,
 
-// ── Store ─────────────────────────────────────────────────────────────
+  listeningPaused: false,
 
-const INITIAL_STREAM: StreamState = {
-  isStreaming: false,
-  phase: '',
-  elapsedMs: 0,
-  activeToolCalls: [],
-  content: '',
-};
+  setBridgeStatus: (connected, error = null) =>
+    set(() => ({ bridgeConnected: connected, bridgeError: error })),
 
-interface AppState {
-  // Conversations
-  conversations: Conversation[];
-  activeId: string | null;
-  messages: ChatMessage[];
-  streamState: StreamState;
+  clearTranscripts: () => set(() => ({ transcripts: [] })),
 
-  // Models & server
-  models: ModelInfo[];
-  modelsLoading: boolean;
-  selectedModel: string;
-  serverInfo: ServerInfo | null;
-  savings: SavingsData | null;
+  setBrainState: (brainState) => set(() => ({ brainState })),
 
-  // Settings
-  settings: Settings;
+  setListeningPaused: (paused) => set(() => ({ listeningPaused: paused })),
 
-  // Command palette
-  commandPaletteOpen: boolean;
-
-  // Sidebar
-  sidebarOpen: boolean;
-
-  // System panel
-  systemPanelOpen: boolean;
-
-  // Opt-in sharing
-  optInEnabled: boolean;
-  optInDisplayName: string;
-  optInEmail: string;
-  optInAnonId: string;
-  optInModalSeen: boolean;
-  optInModalOpen: boolean;
-
-  // Actions: conversations
-  loadConversations: () => void;
-  importOverlayConversation: () => Promise<void>;
-  createConversation: (model?: string) => string;
-  selectConversation: (id: string) => void;
-  deleteConversation: (id: string) => void;
-  loadMessages: (conversationId: string | null) => void;
-  addMessage: (conversationId: string, message: ChatMessage) => void;
-  updateLastAssistant: (
-    conversationId: string,
-    content: string,
-    toolCalls?: ToolCallInfo[],
-    usage?: TokenUsage,
-    telemetry?: MessageTelemetry,
-    audio?: { url: string },
-  ) => void;
-  setStreamState: (state: Partial<StreamState>) => void;
-  resetStream: () => void;
-
-  // Actions: models & server
-  setModels: (models: ModelInfo[]) => void;
-  setModelsLoading: (loading: boolean) => void;
-  setSelectedModel: (model: string) => void;
-  setServerInfo: (info: ServerInfo | null) => void;
-  setSavings: (data: SavingsData | null) => void;
-
-  // Actions: settings
-  updateSettings: (partial: Partial<Settings>) => void;
-
-  // Actions: UI
-  setCommandPaletteOpen: (open: boolean) => void;
-  toggleSidebar: () => void;
-  setSidebarOpen: (open: boolean) => void;
-  toggleSystemPanel: () => void;
-  setSystemPanelOpen: (open: boolean) => void;
-
-  // Data sources (cached between visits to avoid empty-state flicker)
-  cachedConnectors: CachedConnector[] | null;
-  setCachedConnectors: (list: CachedConnector[] | null) => void;
-
-  // Agents
-  managedAgents: ManagedAgent[];
-  managedAgentsLoading: boolean;
-  selectedAgentId: string | null;
-
-  // Actions: agents
-  setManagedAgents: (agents: ManagedAgent[]) => void;
-  setManagedAgentsLoading: (loading: boolean) => void;
-  setSelectedAgentId: (id: string | null) => void;
-
-  // Agent events (live stream)
-  agentEvents: AgentEvent[];
-  addAgentEvent: (event: AgentEvent) => void;
-  clearAgentEvents: () => void;
-
-  // Actions: opt-in sharing
-  setOptIn: (enabled: boolean, displayName: string, email: string) => void;
-  setOptInModalOpen: (open: boolean) => void;
-  markOptInModalSeen: () => void;
-
-  // Logs
-  logEntries: LogEntry[];
-  addLogEntry: (entry: LogEntry) => void;
-  clearLogs: () => void;
-
-  // Model loading
-  modelLoading: boolean;
-  setModelLoading: (loading: boolean) => void;
-}
-
-export const useAppStore = create<AppState>((set, get) => {
-  const initial = loadConversations();
-  const convList = Object.values(initial.conversations).sort(
-    (a, b) => b.updatedAt - a.updatedAt,
-  );
-
-  return {
-    conversations: convList,
-    activeId: initial.activeId,
-    messages:
-      initial.activeId && initial.conversations[initial.activeId]
-        ? initial.conversations[initial.activeId].messages
-        : [],
-    streamState: INITIAL_STREAM,
-
-    models: [],
-    modelsLoading: true,
-    selectedModel: '',
-    serverInfo: null,
-    savings: null,
-
-    settings: loadSettings(),
-
-    commandPaletteOpen: false,
-    sidebarOpen: true,
-    systemPanelOpen: true,
-
-    optInEnabled: localStorage.getItem(OPTIN_KEY) === 'true',
-    optInDisplayName: localStorage.getItem(OPTIN_NAME_KEY) || '',
-    optInEmail: localStorage.getItem(OPTIN_EMAIL_KEY) || '',
-    optInAnonId: localStorage.getItem(OPTIN_ANONID_KEY) || crypto.randomUUID(),
-    optInModalSeen: localStorage.getItem(OPTIN_SEEN_KEY) === 'true',
-    optInModalOpen: false,
-
-    // ── Conversations ───────────────────────────────────────────────
-
-    loadConversations: () => {
-      const store = loadConversations();
-      set({
-        conversations: Object.values(store.conversations).sort(
-          (a, b) => b.updatedAt - a.updatedAt,
-        ),
-        activeId: store.activeId,
-      });
-    },
-
-    importOverlayConversation: async () => {
-      try {
-        const { invoke } = await import('@tauri-apps/api/core');
-        const raw = await invoke<string>('get_overlay_conversation');
-        if (!raw || raw === '[]') return;
-        const overlay = JSON.parse(raw);
-        if (!overlay.id || !overlay.messages?.length) return;
-        const store = loadConversations();
-        const existing = store.conversations[overlay.id];
-        // Only update if the overlay has newer/more messages
-        if (existing && existing.messages.length >= overlay.messages.length) return;
-        store.conversations[overlay.id] = {
-          id: overlay.id,
-          title: overlay.title || 'Overlay chat',
-          createdAt: overlay.createdAt || Date.now(),
-          updatedAt: overlay.updatedAt || Date.now(),
-          model: overlay.model || 'default',
-          messages: overlay.messages,
-        };
-        saveConversations(store);
-        set({
-          conversations: Object.values(store.conversations).sort(
-            (a, b) => b.updatedAt - a.updatedAt,
-          ),
-        });
-      } catch {
-        // Overlay command unavailable (non-Tauri or no overlay data)
+  ingest: (event) =>
+    set((state) => {
+      const ts = event.timestamp * 1000;
+      const data = event.data ?? {};
+      switch (event.type) {
+        case 'wake_trigger': {
+          const source = String(data.source ?? 'unknown');
+          // Bring the window forward on wake — but only if listening is
+          // NOT paused. When the user has muted Hope, wake events should
+          // never yank focus out of whatever app they're working in.
+          // (This still lets a manually-triggered wake — tray menu,
+          // programmatic — pull the dashboard forward when listening is
+          // active, which is the expected affordance.)
+          if (!state.listeningPaused) {
+            (async () => {
+              try {
+                const { getCurrentWindow } = await import(
+                  '@tauri-apps/api/window'
+                );
+                const w = getCurrentWindow();
+                await w.unminimize();
+                await w.show();
+                await w.setFocus();
+              } catch {
+                /* not running inside Tauri, or window API unavailable */
+              }
+            })();
+          }
+          return {
+            lastWake: { source, timestamp: ts },
+            brainState: 'idle',
+            transcripts: pushCapped(
+              state.transcripts,
+              { id: uid(), kind: 'system', text: `wake (${source})`, timestamp: ts },
+              MAX_TRANSCRIPT,
+            ),
+          };
+        }
+        case 'speech_transcript': {
+          const text = String(data.text ?? '').trim();
+          if (!text) return {};
+          return {
+            transcripts: pushCapped(
+              state.transcripts,
+              { id: uid(), kind: 'heard', text, timestamp: ts },
+              MAX_TRANSCRIPT,
+            ),
+          };
+        }
+        case 'speaking_started': {
+          // Hope's TTS started. Override any other state so the orb
+          // immediately switches to the green speaking palette.
+          return { brainState: 'speaking' };
+        }
+        case 'speaking_ended': {
+          // Drop back to idle so the orb stops the speaking envelope.
+          return { brainState: 'idle' };
+        }
+        case 'agent_turn_start':
+        case 'inference_start':
+          return { brainState: 'thinking' };
+        case 'agent_turn_end':
+        case 'inference_end':
+          return { brainState: 'idle' };
+        case 'pane_spawned': {
+          const paneId = String(data.pane_id ?? data.paneId ?? uid());
+          const role = String(data.role ?? data.pane_name ?? 'specialist');
+          const pane: SpecialistPane = { paneId, role, spawnedAt: ts };
+          const isMain = role === 'hope-main';
+          return {
+            brainMainPaneId: isMain ? paneId : state.brainMainPaneId,
+            brainState: isMain ? 'idle' : state.brainState,
+            specialists: isMain
+              ? state.specialists
+              : [...state.specialists.filter((p) => p.paneId !== paneId), pane],
+          };
+        }
+        case 'pane_killed': {
+          const paneId = String(data.pane_id ?? data.paneId ?? '');
+          const role = String(data.role ?? data.pane_name ?? '');
+          if (role === 'hope-main' || paneId === state.brainMainPaneId) {
+            return {
+              brainState: 'sleeping',
+              brainMainPaneId: null,
+              lastSleep: ts,
+              specialists: [],
+            };
+          }
+          return {
+            specialists: state.specialists.filter((p) => p.paneId !== paneId),
+          };
+        }
+        case 'pane_message': {
+          const paneId = String(data.pane_id ?? data.paneId ?? '');
+          const text = String(data.text ?? data.message ?? '').trim();
+          if (!paneId && !text) return {};
+          const updated = state.specialists.map((p) =>
+            p.paneId === paneId ? { ...p, lastMessageAt: ts } : p,
+          );
+          if (text) {
+            return {
+              specialists: updated,
+              transcripts: pushCapped(
+                state.transcripts,
+                { id: uid(), kind: 'brain', text, timestamp: ts },
+                MAX_TRANSCRIPT,
+              ),
+            };
+          }
+          return { specialists: updated };
+        }
+        case 'memory_store': {
+          const content = String(data.content ?? data.value ?? '').trim();
+          if (!content) return {};
+          const entry: MemoryEntry = {
+            id: uid(),
+            content,
+            namespace:
+              typeof data.namespace === 'string' ? data.namespace : undefined,
+            timestamp: ts,
+          };
+          return { memory: pushCapped(state.memory, entry, MAX_MEMORY) };
+        }
+        case 'listening_paused':
+          return { listeningPaused: true };
+        case 'listening_resumed':
+          return { listeningPaused: false };
+        case 'state_snapshot': {
+          // Sent by the daemon right after the websocket handshake so the
+          // store reflects backend reality on every (re)connect — not the
+          // React defaults. Replaces the listed fields; ignores keys we
+          // don't yet bind UI to.
+          const update: Record<string, unknown> = {};
+          if (typeof data.listening_paused === 'boolean') {
+            update.listeningPaused = data.listening_paused;
+          }
+          if (typeof data.brain_state === 'string') {
+            update.brainState = data.brain_state;
+          }
+          if (
+            data.hope_main_pane_id === null ||
+            typeof data.hope_main_pane_id === 'string'
+          ) {
+            update.brainMainPaneId = data.hope_main_pane_id ?? null;
+          }
+          // Hydrate live specialists. Without this the panel only fills
+          // from pane_spawned events that arrive AFTER the WS connects —
+          // anything spawned before connect would be invisible until it
+          // sends a pane_message.
+          if (Array.isArray(data.specialists)) {
+            update.specialists = data.specialists
+              .filter((s): s is Record<string, unknown> =>
+                s !== null && typeof s === 'object',
+              )
+              .map((s) => ({
+                paneId: String(s.pane_id ?? s.paneId ?? uid()),
+                role: String(s.role ?? 'specialist'),
+                spawnedAt:
+                  typeof s.spawned_at === 'number'
+                    ? s.spawned_at * 1000
+                    : typeof s.spawnedAt === 'number'
+                      ? s.spawnedAt
+                      : Date.now(),
+              })) as SpecialistPane[];
+          }
+          return update;
+        }
+        case 'scheduler_task_start':
+          return { ragInFlight: state.ragInFlight + 1 };
+        case 'scheduler_task_end':
+          return {
+            ragInFlight: Math.max(0, state.ragInFlight - 1),
+            ragLastSync: ts,
+          };
+        default:
+          return {};
       }
-    },
-
-    createConversation: (model?: string) => {
-      const store = loadConversations();
-      const conv: Conversation = {
-        id: generateId(),
-        title: 'New chat',
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        model: model || get().selectedModel || 'default',
-        messages: [],
-      };
-      store.conversations[conv.id] = conv;
-      store.activeId = conv.id;
-      saveConversations(store);
-      set({
-        conversations: Object.values(store.conversations).sort(
-          (a, b) => b.updatedAt - a.updatedAt,
-        ),
-        activeId: conv.id,
-        messages: [],
-      });
-      return conv.id;
-    },
-
-    selectConversation: (id: string) => {
-      const store = loadConversations();
-      store.activeId = id;
-      saveConversations(store);
-      const conv = store.conversations[id];
-      set({
-        activeId: id,
-        messages: conv ? conv.messages : [],
-      });
-    },
-
-    deleteConversation: (id: string) => {
-      const store = loadConversations();
-      delete store.conversations[id];
-      if (store.activeId === id) {
-        const remaining = Object.keys(store.conversations);
-        store.activeId = remaining.length > 0 ? remaining[0] : null;
-      }
-      saveConversations(store);
-      const convList = Object.values(store.conversations).sort(
-        (a, b) => b.updatedAt - a.updatedAt,
-      );
-      const activeConv = store.activeId
-        ? store.conversations[store.activeId]
-        : null;
-      set({
-        conversations: convList,
-        activeId: store.activeId,
-        messages: activeConv ? activeConv.messages : [],
-      });
-    },
-
-    loadMessages: (conversationId: string | null) => {
-      if (!conversationId) {
-        set({ messages: [] });
-        return;
-      }
-      const store = loadConversations();
-      const conv = store.conversations[conversationId];
-      set({ messages: conv ? conv.messages : [] });
-    },
-
-    addMessage: (conversationId: string, message: ChatMessage) => {
-      const store = loadConversations();
-      const conv = store.conversations[conversationId];
-      if (!conv) return;
-      conv.messages.push(message);
-      conv.updatedAt = Date.now();
-      if (message.role === 'user' && conv.title === 'New chat') {
-        conv.title =
-          message.content.slice(0, 50) +
-          (message.content.length > 50 ? '...' : '');
-      }
-      saveConversations(store);
-      set({
-        messages: [...conv.messages],
-        conversations: Object.values(store.conversations).sort(
-          (a, b) => b.updatedAt - a.updatedAt,
-        ),
-      });
-    },
-
-    updateLastAssistant: (
-      conversationId: string,
-      content: string,
-      toolCalls?: ToolCallInfo[],
-      usage?: TokenUsage,
-      telemetry?: MessageTelemetry,
-      audio?: { url: string },
-    ) => {
-      const store = loadConversations();
-      const conv = store.conversations[conversationId];
-      if (!conv) return;
-      const lastMsg = conv.messages[conv.messages.length - 1];
-      if (lastMsg && lastMsg.role === 'assistant') {
-        lastMsg.content = content;
-        if (toolCalls) lastMsg.toolCalls = toolCalls;
-        if (usage) lastMsg.usage = usage;
-        if (telemetry) lastMsg.telemetry = telemetry;
-        if (audio) lastMsg.audio = audio;
-        conv.updatedAt = Date.now();
-        saveConversations(store);
-        set({ messages: [...conv.messages] });
-      }
-    },
-
-    setStreamState: (partial: Partial<StreamState>) => {
-      set((s) => ({ streamState: { ...s.streamState, ...partial } }));
-    },
-
-    resetStream: () => {
-      set({ streamState: INITIAL_STREAM });
-    },
-
-    // ── Models & server ────────────────────────────────────────────
-
-    setModels: (models: ModelInfo[]) => set({ models }),
-    setModelsLoading: (loading: boolean) => set({ modelsLoading: loading }),
-    setSelectedModel: (model: string) => set({ selectedModel: model }),
-    setServerInfo: (info: ServerInfo | null) => set({ serverInfo: info }),
-    setSavings: (data: SavingsData | null) => set({ savings: data }),
-
-    cachedConnectors: null,
-    setCachedConnectors: (list) => set({ cachedConnectors: list }),
-
-    // ── Settings ───────────────────────────────────────────────────
-
-    updateSettings: (partial: Partial<Settings>) => {
-      const updated = { ...get().settings, ...partial };
-      saveSettings(updated);
-      set({ settings: updated });
-    },
-
-    // ── UI ──────────────────────────────────────────────────────────
-
-    setCommandPaletteOpen: (open: boolean) => set({ commandPaletteOpen: open }),
-    toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
-    setSidebarOpen: (open: boolean) => set({ sidebarOpen: open }),
-    toggleSystemPanel: () => set((s) => ({ systemPanelOpen: !s.systemPanelOpen })),
-    setSystemPanelOpen: (open: boolean) => set({ systemPanelOpen: open }),
-
-    // ── Agents ─────────────────────────────────────────────────────
-
-    managedAgents: [],
-    managedAgentsLoading: false,
-    selectedAgentId: null,
-
-    setManagedAgents: (agents) => set({ managedAgents: agents }),
-    setManagedAgentsLoading: (loading) => set({ managedAgentsLoading: loading }),
-    setSelectedAgentId: (id) => set({ selectedAgentId: id }),
-
-    agentEvents: [],
-    addAgentEvent: (event) => set((s) => ({
-      agentEvents: [...s.agentEvents.slice(-99), event],
-    })),
-    clearAgentEvents: () => set({ agentEvents: [] }),
-
-    // ── Logs ────────────────────────────────────────────────────────
-    logEntries: [],
-    addLogEntry: (entry) => set((s) => ({
-      logEntries: [...s.logEntries.slice(-499), entry],
-    })),
-    clearLogs: () => set({ logEntries: [] }),
-
-    // ── Model loading ───────────────────────────────────────────────
-    modelLoading: false,
-    setModelLoading: (loading) => set({ modelLoading: loading }),
-
-    // ── Opt-in sharing ──────────────────────────────────────────────
-
-    setOptIn: (enabled: boolean, displayName: string, email: string) => {
-      const anonId = get().optInAnonId;
-      localStorage.setItem(OPTIN_KEY, String(enabled));
-      localStorage.setItem(OPTIN_NAME_KEY, displayName);
-      localStorage.setItem(OPTIN_EMAIL_KEY, email);
-      localStorage.setItem(OPTIN_ANONID_KEY, anonId);
-      set({ optInEnabled: enabled, optInDisplayName: displayName, optInEmail: email });
-    },
-    setOptInModalOpen: (open: boolean) => set({ optInModalOpen: open }),
-    markOptInModalSeen: () => {
-      localStorage.setItem(OPTIN_SEEN_KEY, 'true');
-      set({ optInModalSeen: true });
-    },
-  };
-});
-
-export { generateId };
+    }),
+}));

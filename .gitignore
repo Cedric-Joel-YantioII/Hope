@@ -98,3 +98,14 @@ src/hope/channels/whatsapp_baileys_bridge/node_modules/
 # Second Repos
 Inline/
 scratch/
+
+# Local agent state — pure runtime, regenerable, never commit
+.claude-flow/
+.swarm/
+.hope-io/
+agentdb.rvf
+agentdb.rvf.lock
+ruvector.db
+ruvector.db-*
+*.db-shm
+*.db-wal

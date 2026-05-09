@@ -178,16 +178,16 @@ def digest(
         return
 
     if fresh:
-        # Trigger on-demand generation
-        console.print("[yellow]Generating fresh digest...[/yellow]")
-        try:
-            from hope.sdk import Hope
-
-            with Hope() as j:
-                result = j.ask("Generate my morning digest", agent="morning_digest")
-                console.print(Markdown(result))
-        except Exception as exc:
-            console.print(f"[red]Failed to generate digest: {exc}[/red]")
+        # On-demand generation requires a running engine + agent loop
+        # which the voice-first daemon owns, not this CLI. Point users
+        # at the scheduled path instead of booting a parallel stack.
+        console.print(
+            "[yellow]Fresh digest generation runs inside the Hope daemon.[/yellow]"
+        )
+        console.print(
+            "Run [bold]hope start[/bold] and the morning_digest agent will "
+            "produce one on its next scheduled tick."
+        )
         store.close()
         return
 

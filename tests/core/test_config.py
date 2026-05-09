@@ -415,20 +415,25 @@ class TestSandboxConfig:
 class TestSchedulerConfig:
     def test_defaults(self) -> None:
         sc = SchedulerConfig()
-        assert sc.enabled is False
+        # Default ON — the daemon's nightly memory consolidation +
+        # hourly connector sync depend on the scheduler. Users opt out
+        # with ``[scheduler] enabled = false``.
+        assert sc.enabled is True
         assert sc.poll_interval == 60
         assert sc.db_path == ""
 
     def test_custom_values(self) -> None:
-        sc = SchedulerConfig(enabled=True, poll_interval=30, db_path="/tmp/sched.db")
-        assert sc.enabled is True
+        sc = SchedulerConfig(
+            enabled=False, poll_interval=30, db_path="/tmp/sched.db"
+        )
+        assert sc.enabled is False
         assert sc.poll_interval == 30
         assert sc.db_path == "/tmp/sched.db"
 
     def test_on_hope_config(self) -> None:
         cfg = HopeConfig()
         assert isinstance(cfg.scheduler, SchedulerConfig)
-        assert cfg.scheduler.enabled is False
+        assert cfg.scheduler.enabled is True
 
     def test_loads_from_toml(self, tmp_path: Path) -> None:
         toml_file = tmp_path / "config.toml"

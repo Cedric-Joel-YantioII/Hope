@@ -34,31 +34,12 @@ class TestCLI:
         out = result.output.lower()
         assert result.exit_code != 0 or "not installed" in out or "no inference" in out
 
-    def test_model_subcommands_exist(self) -> None:
-        result = CliRunner().invoke(cli, ["model", "--help"])
-        assert result.exit_code == 0
-        assert "list" in result.output
-        assert "info" in result.output
-        assert "pull" in result.output
-
     def test_memory_subcommands_exist(self) -> None:
         result = CliRunner().invoke(cli, ["memory", "--help"])
         assert result.exit_code == 0
         assert "index" in result.output
         assert "search" in result.output
         assert "stats" in result.output
-
-    def test_telemetry_subcommands_exist(self) -> None:
-        result = CliRunner().invoke(cli, ["telemetry", "--help"])
-        assert result.exit_code == 0
-        assert "stats" in result.output
-        assert "export" in result.output
-        assert "clear" in result.output
-
-    def test_bench_subcommands_exist(self) -> None:
-        result = CliRunner().invoke(cli, ["bench", "--help"])
-        assert result.exit_code == 0
-        assert "run" in result.output
 
     def test_scheduler_subcommands_exist(self) -> None:
         result = CliRunner().invoke(cli, ["scheduler", "--help"])
@@ -69,19 +50,12 @@ class TestCLI:
         assert "resume" in result.output
         assert "cancel" in result.output
 
-    def test_channel_subcommands_exist(self) -> None:
-        result = CliRunner().invoke(cli, ["channel", "--help"])
-        assert result.exit_code == 0
-        assert "send" in result.output
-        assert "list" in result.output
-
     def test_init_creates_config(self, tmp_path: Path) -> None:
         config_dir = tmp_path / ".hope"
         config_path = config_dir / "config.toml"
         with (
             mock.patch("hope.cli.init_cmd.DEFAULT_CONFIG_DIR", config_dir),
             mock.patch("hope.cli.init_cmd.DEFAULT_CONFIG_PATH", config_path),
-            mock.patch("hope.cli.init_cmd.PrivacyScanner"),
         ):
             result = CliRunner().invoke(
                 cli, ["init", "--engine", "ollama", "--no-download"]

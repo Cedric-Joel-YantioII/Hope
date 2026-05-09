@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  launchd plist template for Hope's background skill evolver.
+
+  DEFAULT: enabled=false (HOPE_SKILL_EVOLVER_ENABLED=0). Copy this file to
+  ~/Library/LaunchAgents/ and set HOPE_SKILL_EVOLVER_ENABLED to "1" to turn
+  the evolver on. Then:
+
+      launchctl load ~/Library/LaunchAgents/com.joelc.hope-skill-evolver.plist
+
+  The evolver respects the A/B promotion rule and never overwrites hand-
+  written skills (generated-dir guard in hope_skill_evolve.mjs).
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.joelc.hope-skill-evolver</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/joelc/Documents/Github/Hope/src/skills/runner/evolve-loop.sh</string>
+    </array>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>HOPE_SKILL_EVOLVER_ENABLED</key>
+        <string>0</string>
+        <key>HOPE_SKILL_EVOLVE_INTERVAL_SEC</key>
+        <string>3600</string>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/Users/joelc/.local/bin:/usr/bin:/bin</string>
+    </dict>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <false/>
+    <key>StandardOutPath</key>
+    <string>/Users/joelc/Documents/Github/Hope/logs/hope-skill-evolver.stdout.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/joelc/Documents/Github/Hope/logs/hope-skill-evolver.stderr.log</string>
+</dict>
+</plist>

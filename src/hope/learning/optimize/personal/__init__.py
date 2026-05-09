@@ -1,7 +1,11 @@
-"""Personal benchmark system -- synthesize benchmarks from interaction traces."""
+"""Personal benchmark package — synthesizer only.
 
-from hope.learning.optimize.personal.dataset import PersonalBenchmarkDataset
-from hope.learning.optimize.personal.scorer import PersonalBenchmarkScorer
+The scorer + dataset adapter leaned on the deleted ``hope.evals`` stack
+and were removed during the voice-arch cleanup.
+"""
+
+from __future__ import annotations
+
 from hope.learning.optimize.personal.synthesizer import (
     PersonalBenchmark,
     PersonalBenchmarkSample,
@@ -12,6 +16,4 @@ __all__ = [
     "PersonalBenchmark",
     "PersonalBenchmarkSample",
     "PersonalBenchmarkSynthesizer",
-    "PersonalBenchmarkDataset",
-    "PersonalBenchmarkScorer",
 ]

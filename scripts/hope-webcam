@@ -1,0 +1,149 @@
+#!/usr/bin/env bash
+# hope-webcam — capture one still from the default webcam for Hope.
+#
+# Grab a JPEG from the built-in camera, downsize it, persist to
+# ~/.hope/webcam-captures/, print the path. Hope's brain can then
+# `Read` that image directly — no LLM-vision call needed. Pair with
+# hope-see when you want Hope to see both the screen and the user.
+#
+# Every capture writes a sidecar `<basename>.json` aligned with
+# hope-see's schema (shared reader = Hope's brain). Keys:
+#   { ts, iso, image, image_full, label, dims, dims_full,
+#     size_bytes, size_bytes_full, source, device,
+#     embedded, compressed }
+#
+# Auto-prune: after each capture, if the directory has more than
+# HOPE_WEBCAM_MAX entries (default 200), the oldest are deleted.
+#
+# Usage:
+#   hope-webcam                         # capture + return path
+#   hope-webcam --label "morning-check" # add a searchable tag
+set -euo pipefail
+
+MAX_DIM="${HOPE_WEBCAM_MAX_DIM:-1024}"
+WEBCAM_DIR="${HOPE_WEBCAM_DIR:-$HOME/.hope/webcam-captures}"
+WEBCAM_MAX="${HOPE_WEBCAM_MAX:-200}"
+WARMUP="${HOPE_WEBCAM_WARMUP:-0.5}"
+DEVICE="${HOPE_WEBCAM_DEVICE:-}"
+
+LABEL=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --label)  shift; LABEL="${1:-}"; shift || true ;;
+        # Regex-gated on leading "#" so we stop at the first non-comment
+        # line — immune to header growth. Skip the shebang (NR==1).
+        --help|-h) awk 'NR==1 {next} /^#($| )/ {sub(/^# ?/,""); print; next} {exit}' "$0"; exit 0 ;;
+        *) echo "hope-webcam: unknown arg '$1'" >&2; exit 2 ;;
+    esac
+done
+
+# Verify imagesnap is installed. If not, point the user at the fix.
+if ! command -v imagesnap >/dev/null 2>&1; then
+    echo "hope-webcam: imagesnap not found. Install with: brew install imagesnap" >&2
+    exit 2
+fi
+
+mkdir -p "$WEBCAM_DIR"
+# $RANDOM guards against same-second PID collisions when two captures
+# fire inside the same second with recycled PIDs.
+TS=$(date +%Y%m%d_%H%M%S)_$$_${RANDOM}
+# Two artifacts are kept: the original full-resolution capture (for
+# detailed reads by Hope's multimodal context) and a downsized copy
+# (fast for Claude context + dashboard previews). Both persist to disk;
+# the sidecar references both paths so callers and future lifecycle
+# jobs can pick whichever they need.
+RAW="$WEBCAM_DIR/${TS}_full.jpg"
+SMALL="$WEBCAM_DIR/${TS}.jpg"
+SIDECAR="$WEBCAM_DIR/${TS}.json"
+
+# Capture. -q silences imagesnap chatter, -w gives the camera a brief
+# warm-up so the first frame isn't black. macOS will prompt for Camera
+# permission on first run; we detect denial by an empty output file.
+# Capture both stderr-text AND the imagesnap exit code (without `|| true`
+# swallowing it) so downstream logic can distinguish permission denial
+# from other failure modes.
+set +e
+IMAGESNAP_ERR=$(imagesnap ${DEVICE:+-d "$DEVICE"} -q -w "$WARMUP" "$RAW" 2>&1 >/dev/null)
+IMAGESNAP_RC=$?
+set -e
+
+if [[ "$IMAGESNAP_RC" -ne 0 || ! -s "$RAW" ]]; then
+    # Either permission denial or a silent failure — either way, the
+    # user needs to grant Camera permission. Exit 3 matches hope-see's
+    # "permission required" signal.
+    if echo "$IMAGESNAP_ERR" | grep -qiE 'not authorized|permission|denied|privacy'; then
+        echo "hope-webcam: Camera permission denied. Grant it in" >&2
+        echo "  System Settings → Privacy & Security → Camera for your terminal/launcher," >&2
+        echo "  then try again. (imagesnap: ${IMAGESNAP_ERR:-<no output>})" >&2
+    else
+        echo "hope-webcam: camera capture failed (rc=$IMAGESNAP_RC). Likely a Camera" >&2
+        echo "  permission issue — check System Settings → Privacy & Security → Camera." >&2
+        echo "  (imagesnap said: ${IMAGESNAP_ERR:-<no output>})" >&2
+    fi
+    rm -f "$RAW"
+    exit 3
+fi
+
+RAW_DIMS=$(sips -g pixelWidth -g pixelHeight "$RAW" 2>/dev/null | awk '/pixelWidth/ {w=$2} /pixelHeight/ {h=$2} END {print w"x"h}')
+if [[ -z "$RAW_DIMS" || "$RAW_DIMS" == "x" ]]; then
+    echo "hope-webcam: failed to read dimensions from captured image ($RAW)" >&2
+    rm -f "$RAW"
+    exit 4
+fi
+RAW_SIZE=$(stat -f%z "$RAW" 2>/dev/null || echo 0)
+# Derive a downsized preview for quick reads / dashboard. Full-res RAW
+# is preserved — DO NOT delete it. A later lifecycle job handles
+# embedding + pruning on its own schedule.
+sips -Z "$MAX_DIM" "$RAW" --out "$SMALL" >/dev/null 2>&1
+DIMS=$(sips -g pixelWidth -g pixelHeight "$SMALL" 2>/dev/null | awk '/pixelWidth/ {w=$2} /pixelHeight/ {h=$2} END {print w"x"h}')
+if [[ -z "$DIMS" || "$DIMS" == "x" ]]; then
+    echo "hope-webcam: failed to read dimensions from preview ($SMALL)" >&2
+    rm -f "$RAW" "$SMALL"
+    exit 4
+fi
+
+# Sidecar — always written. Built in Python so the JSON is well-formed
+# regardless of label content. Schema is aligned with hope-see's sidecar
+# (same reader = Hope's brain); `source` and `device` are the
+# webcam-specific additions. Records both artifacts (full-res RAW +
+# downsized preview) so future lifecycle jobs can pick which to embed
+# / vectorize / prune.
+/usr/bin/python3 - "$SIDECAR" "$SMALL" "$RAW" "$LABEL" "$DIMS" "$RAW_DIMS" "$RAW_SIZE" "$DEVICE" <<'PY'
+import json, sys, time, os
+sidecar, small, raw, label, dims_small, dims_raw, raw_size, device = sys.argv[1:9]
+data = {
+    "ts": time.time(),
+    "iso": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+    "image": small,              # downsized preview (fast to Read)
+    "image_full": raw,           # full-res capture (detail reads + future embed)
+    "label": label,
+    "dims": dims_small,
+    "dims_full": dims_raw,
+    "size_bytes": os.path.getsize(small),
+    "size_bytes_full": int(raw_size) if raw_size.isdigit() else None,
+    "source": "webcam",
+    "device": device or None,
+    "embedded": False,           # flipped true by the lifecycle job
+    "compressed": False,         # flipped true after RAW is converted to webp/heic
+}
+with open(sidecar, "w") as f:
+    json.dump(data, f, indent=2)
+PY
+
+# Auto-prune: keep last $WEBCAM_MAX preview JPGs. Each capture is
+# a triple: the preview (.jpg), the full-res (*_full.jpg), and the
+# sidecar (.json). When we prune a preview, remove the other two too.
+COUNT=$(ls -1 "$WEBCAM_DIR"/[0-9]*_[0-9]*.jpg 2>/dev/null \
+        | grep -v "_full.jpg$" | wc -l | tr -d ' ')
+if [[ "$COUNT" -gt "$WEBCAM_MAX" ]]; then
+    EXCESS=$((COUNT - WEBCAM_MAX))
+    /bin/ls -1t "$WEBCAM_DIR"/[0-9]*_[0-9]*.jpg 2>/dev/null \
+      | grep -v "_full.jpg$" | tail -n "$EXCESS" | while read -r oldjpg; do
+        base="${oldjpg%.jpg}"
+        rm -f "$oldjpg" "${base}_full.jpg" "${base}.json"
+    done
+fi
+
+# Stdout: the preview path. Caller (Hope's brain) will `Read` it.
+echo "$SMALL"

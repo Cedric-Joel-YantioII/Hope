@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+# hope-agents — list / kill specialist tmux panes.
+#
+# Usage:
+#   hope-agents              # list live specialists (JSON)
+#   hope-agents kill <pane>  # tear down a specialist
+#   hope-agents kill-all     # tear down ALL specialists
+set -euo pipefail
+
+HOPE_ROOT="/Users/joelc/Documents/Github/Hope"
+HOPE_PY="${HOPE_ROOT}/.venv/bin/python3"
+if [[ ! -x "$HOPE_PY" ]]; then
+  HOPE_PY="$(command -v python3)"
+fi
+PYTHONPATH_EXTRA="${HOPE_ROOT}/src"
+if [[ -n "${PYTHONPATH:-}" ]]; then
+  export PYTHONPATH="${PYTHONPATH_EXTRA}:${PYTHONPATH}"
+else
+  export PYTHONPATH="${PYTHONPATH_EXTRA}"
+fi
+
+CMD="${1:-list}"
+shift || true
+
+case "$CMD" in
+  list|"")
+    exec "$HOPE_PY" - <<'PY'
+import json
+from hope.daemon.core import send_control
+resp = send_control("list_specialists", {})
+print(json.dumps(resp, indent=2))
+PY
+    ;;
+  kill)
+    if [[ $# -lt 1 ]]; then
+      echo "hope-agents kill: need pane_id" >&2; exit 2
+    fi
+    PANE="$1"
+    export HOPE_KILL_PANE="$PANE"
+    exec "$HOPE_PY" - <<'PY'
+import json, os
+from hope.daemon.core import send_control
+resp = send_control("kill_specialist", {"pane_id": os.environ["HOPE_KILL_PANE"]})
+print(json.dumps(resp))
+PY
+    ;;
+  kill-all)
+    exec "$HOPE_PY" - <<'PY'
+import json
+from hope.daemon.core import send_control
+listing = send_control("list_specialists", {})
+killed = []
+for spec in (listing.get("specialists") or []):
+    r = send_control("kill_specialist", {"pane_id": spec["pane_id"]})
+    killed.append({"pane_id": spec["pane_id"], "ok": r.get("ok")})
+print(json.dumps({"killed": killed}, indent=2))
+PY
+    ;;
+  -h|--help)
+    cat <<'USAGE'
+hope-agents — list / kill specialist tmux panes.
+
+Usage:
+  hope-agents              # list live specialists (JSON)
+  hope-agents kill <pane>  # tear down a specialist
+  hope-agents kill-all     # tear down ALL specialists
+USAGE
+    ;;
+  *)
+    echo "hope-agents: unknown subcommand '$CMD' (try list | kill | kill-all)" >&2
+    exit 2
+    ;;
+esac

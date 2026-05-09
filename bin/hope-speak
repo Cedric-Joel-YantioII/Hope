@@ -1,0 +1,121 @@
+#!/usr/bin/env bash
+# hope-speak — enqueue a line to Hope's voice-out queue.
+#
+# Usage:
+#   hope-speak "Hello from the brain."
+#   echo "line 1" | hope-speak --stdin
+#   hope-speak --priority 10 --voice Ava "High priority"
+#
+# Design: a pure writer. It appends one jsonl record and exits. The
+# long-running tts_consumer (see scripts/hope-voice-bridge.sh) reads
+# the queue and actually speaks. Keeping writer/consumer split means
+# many shells / CC subprocesses can enqueue without coordinating.
+set -euo pipefail
+
+HOPE_ROOT="/Users/joelc/Documents/Github/Hope"
+HOPE_PY="${HOPE_ROOT}/.venv/bin/python3"
+if [[ ! -x "$HOPE_PY" ]]; then
+  HOPE_PY="$(command -v python3)"
+fi
+
+PYTHONPATH_EXTRA="${HOPE_ROOT}/src"
+if [[ -n "${PYTHONPATH:-}" ]]; then
+  export PYTHONPATH="${PYTHONPATH_EXTRA}:${PYTHONPATH}"
+else
+  export PYTHONPATH="${PYTHONPATH_EXTRA}"
+fi
+
+USE_STDIN=0
+VOICE=""
+PRIORITY=""
+TEXT_ARGS=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --stdin)
+      USE_STDIN=1
+      shift
+      ;;
+    --voice)
+      VOICE="${2:-}"
+      shift 2
+      ;;
+    --voice=*)
+      VOICE="${1#--voice=}"
+      shift
+      ;;
+    --priority)
+      PRIORITY="${2:-}"
+      shift 2
+      ;;
+    --priority=*)
+      PRIORITY="${1#--priority=}"
+      shift
+      ;;
+    -h|--help)
+      cat <<'USAGE'
+hope-speak — enqueue text to Hope's voice-out queue.
+
+Usage:
+  hope-speak [--voice NAME] [--priority N] "text to speak"
+  echo "text" | hope-speak [--voice NAME] [--priority N] --stdin
+
+Flags:
+  --voice NAME      macOS `say` voice override (default: $HOPE_VOICE or Samantha)
+  --priority N      Higher speaks first within a poll cycle (default: 0)
+  --stdin           Read text from stdin instead of argv
+  -h, --help        Show this help
+
+Queue file: ~/Documents/Github/Hope/.hope-io/tts-out.jsonl
+USAGE
+      exit 0
+      ;;
+    --)
+      shift
+      while [[ $# -gt 0 ]]; do TEXT_ARGS+=("$1"); shift; done
+      break
+      ;;
+    -*)
+      echo "hope-speak: unknown flag $1" >&2
+      exit 2
+      ;;
+    *)
+      TEXT_ARGS+=("$1")
+      shift
+      ;;
+  esac
+done
+
+if [[ $USE_STDIN -eq 1 ]]; then
+  TEXT="$(cat)"
+else
+  if [[ ${#TEXT_ARGS[@]} -eq 0 ]]; then
+    echo "hope-speak: no text supplied (use --stdin or pass as argument)" >&2
+    exit 2
+  fi
+  TEXT="${TEXT_ARGS[*]}"
+fi
+
+export HOPE_SPEAK_TEXT="$TEXT"
+export HOPE_SPEAK_VOICE="$VOICE"
+export HOPE_SPEAK_PRIORITY="$PRIORITY"
+
+exec "$HOPE_PY" - <<'PY'
+import os
+import sys
+
+from voice_bridge.hope_speak_append import append_speech_line
+
+text = os.environ.get("HOPE_SPEAK_TEXT", "")
+voice = os.environ.get("HOPE_SPEAK_VOICE") or None
+priority_raw = os.environ.get("HOPE_SPEAK_PRIORITY") or None
+priority = int(priority_raw) if priority_raw else None
+
+try:
+    record_id = append_speech_line(text, voice=voice, priority=priority)
+except ValueError as exc:
+    print(f"hope-speak: {exc}", file=sys.stderr)
+    sys.exit(2)
+
+print(record_id)
+PY

@@ -21,6 +21,7 @@ import logging
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import click
@@ -69,6 +70,46 @@ def start(no_wake: bool, detach: bool) -> None:
 
     # Foreground mode — we are the daemon.
     DEFAULT_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    # Configure logging so daemon.log actually captures INFO diagnostics
+    # from the orchestrator, wake handler, and speech-to-brain bridge.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+        force=True,
+    )
+    # Parent-death watch — arm BEFORE daemon.start(). When Hope.app
+    # spawns the daemon it sets HOPE_PARENT_PID=<app_pid>. We poll that
+    # PID every second and SIGTERM ourselves if it disappears. Must be
+    # armed before start() because first-run model downloads
+    # (faster-whisper medium.en is ~1.5 GB) block start() for minutes —
+    # if the user kills Hope.app during that window we'd otherwise
+    # orphan the daemon.
+    parent_pid_env = os.environ.get("HOPE_PARENT_PID")
+    if parent_pid_env and parent_pid_env.isdigit():
+        import signal as _signal
+        import threading as _threading
+
+        watch_pid = int(parent_pid_env)
+
+        def _watch_parent() -> None:
+            while True:
+                try:
+                    os.kill(watch_pid, 0)
+                except ProcessLookupError:
+                    logger.info(
+                        "parent pid %d gone — shutting down daemon", watch_pid
+                    )
+                    os.kill(os.getpid(), _signal.SIGTERM)
+                    return
+                except PermissionError:
+                    pass
+                time.sleep(1.0)
+
+        _threading.Thread(
+            target=_watch_parent, name="hope-parent-watch", daemon=True
+        ).start()
+        logger.info("parent-death watch armed for pid=%d", watch_pid)
+
     daemon = HopeDaemon(enable_wake=not no_wake)
     try:
         state = daemon.start()
@@ -96,9 +137,21 @@ def start(no_wake: bool, detach: bool) -> None:
 
 
 def _spawn_detached(*, no_wake: bool, console: Console) -> None:
-    """Re-exec ``python -m hope.cli start --foreground`` as a background proc."""
+    """Re-exec ``python -m hope.cli start --foreground`` as a background proc.
+
+    Polls for the control socket up to ~6 s after spawn so callers
+    chaining ``hope start --detach && hope wake`` don't race the
+    PID-file write and end up double-spawning.
+    """
+    import time as _time
+
     DEFAULT_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-    from hope.daemon.core import LOG_FILE
+    from hope.daemon.core import (
+        CONTROL_SOCKET,
+        LOG_FILE,
+        PID_FILE,
+        read_pid,
+    )
 
     cmd = [sys.executable, "-m", "hope.cli", "start", "--foreground"]
     if no_wake:
@@ -113,8 +166,18 @@ def _spawn_detached(*, no_wake: bool, console: Console) -> None:
         cwd=str(Path.cwd()),
         env=os.environ.copy(),
     )
+    # Wait until the daemon has bound its control socket so the very
+    # next ``hope wake`` / ``hope status`` call sees a live daemon.
+    deadline = _time.monotonic() + 8.0
+    ready_pid: int | None = None
+    while _time.monotonic() < deadline:
+        ready_pid = read_pid(PID_FILE)
+        if ready_pid and CONTROL_SOCKET.exists():
+            break
+        _time.sleep(0.1)
+    final_pid = ready_pid or proc.pid
     console.print(
-        f"[green]Hope is launching in the background[/green] (PID {proc.pid})\n"
+        f"[green]Hope is launching in the background[/green] (PID {final_pid})\n"
         f"  log: {LOG_FILE}\n"
         "Use 'hope status' to confirm readiness, 'hope sleep' to stop."
     )

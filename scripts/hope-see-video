@@ -1,0 +1,121 @@
+#!/usr/bin/env bash
+# hope-see-video — capture a short screen video, extract frames Hope's brain
+# can `Read` one-by-one. Mirrors `hope-see`'s shape: fresh directory under
+# ~/.hope/screen-videos/<TS>_<pid>/, sidecar `metadata.json`, prints the
+# directory path on stdout so the caller can pick frames off disk.
+#
+# Default mode is the cheap path: no LLM inference. Caller runs
+# `hope-see-video <seconds>`, then reads `frame_0001.jpg`, `frame_0002.jpg`,
+# ... directly into multimodal context. 1 fps / max 1024px long-edge so
+# each frame is light enough for context without losing the obvious.
+#
+# Usage:
+#   hope-see-video                 # 5-second default
+#   hope-see-video 3               # 3-second clip
+#   hope-see-video 10 --label "onboarding-flow"
+set -euo pipefail
+
+VIDEO_DIR="${HOPE_SCREEN_VIDEO_DIR:-$HOME/.hope/screen-videos}"
+MAX_DIM="${HOPE_VISION_MAX_DIM:-1024}"
+MAX_DURATION=15
+DURATION=5
+LABEL=""
+
+# Parse args. Positional integer = seconds; everything else is a flag.
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --label)     shift; LABEL="${1:-}"; shift || true ;;
+        --help|-h)   sed -n '2,16p' "$0"; exit 0 ;;
+        ''|*[!0-9]*) echo "hope-see-video: unknown arg '$1'" >&2; exit 1 ;;
+        *)           DURATION="$1"; shift ;;
+    esac
+done
+
+# Clamp duration to [1, MAX_DURATION]. Long captures blow up frame count
+# and context budget; 15s is the spec ceiling.
+[[ "$DURATION" -lt 1 ]]  && DURATION=1
+[[ "$DURATION" -gt "$MAX_DURATION" ]] && DURATION="$MAX_DURATION"
+
+if ! command -v ffmpeg >/dev/null 2>&1; then
+    echo "hope-see-video: ffmpeg not found. Install with: brew install ffmpeg" >&2
+    exit 2
+fi
+
+TS=$(date +%Y%m%d_%H%M%S)_$$
+OUT="$VIDEO_DIR/$TS"
+mkdir -p "$OUT"
+# If we get SIGINT/SIGTERM mid-capture, don't leave a half-written session dir
+# hanging around for future reads to stumble on.
+trap 'rm -rf "$OUT"; exit 130' INT TERM
+VIDEO="$OUT/video.mov"
+
+# screencapture -V <seconds> runs for exactly that duration then exits.
+# -v is video mode; no -x flag exists for video, so it will play the
+# start/stop sound unless the system is muted — that's expected.
+# Capture stderr so we can surface the real reason instead of a vague
+# "failed" message; macOS sometimes exits 0 but writes a zero-byte file
+# when Screen Recording permission is missing, so we also post-check.
+CAPTURE_ERR=$(screencapture -V "$DURATION" -v "$VIDEO" 2>&1)
+CAPTURE_RC=$?
+
+if [[ "$CAPTURE_RC" -ne 0 || ! -s "$VIDEO" ]]; then
+    echo "hope-see-video: screen capture failed — run 'hope-permissions' to grant Screen Recording access." >&2
+    [[ -n "$CAPTURE_ERR" ]] && echo "  screencapture: $CAPTURE_ERR" >&2
+    rm -rf "$OUT"
+    exit 3
+fi
+
+# Extract frames at 1 fps, downsize to MAX_DIM on the long edge. The
+# force_original_aspect_ratio=decrease trick keeps small screens from
+# being upscaled. -q:v 5 ≈ jpeg quality 85 — small enough for context,
+# sharp enough to read UI text.
+if ! ffmpeg -i "$VIDEO" \
+        -vf "fps=1,scale='min($MAX_DIM,iw)':'min($MAX_DIM,ih)':force_original_aspect_ratio=decrease" \
+        -q:v 5 \
+        "$OUT/frame_%04d.jpg" -hide_banner -loglevel error 2>/dev/null; then
+    echo "hope-see-video: ffmpeg frame extraction failed" >&2
+    exit 4
+fi
+
+# Collect frame paths (sorted) and dims of the first frame for metadata.
+FRAME_COUNT=$(/bin/ls -1 "$OUT"/frame_*.jpg 2>/dev/null | wc -l | tr -d ' ')
+if [[ "$FRAME_COUNT" -eq 0 ]]; then
+    echo "hope-see-video: no frames extracted (video might be too short)" >&2
+    exit 4
+fi
+FIRST_FRAME="$OUT/frame_0001.jpg"
+DIMS=$(sips -g pixelWidth -g pixelHeight "$FIRST_FRAME" 2>/dev/null \
+       | awk '/pixelWidth/ {w=$2} /pixelHeight/ {h=$2} END {print w"x"h}')
+VIDEO_SIZE=$(stat -f%z "$VIDEO" 2>/dev/null || echo 0)
+
+# Write metadata.json in Python so label + path lists are safely escaped.
+# Key shape aligns with hope-see's sidecar (ts/iso/label/dims/embedded/
+# compressed) AND the reviewer's explicit contract (timestamp, duration_
+# seconds, frame_count, frames, video_path, source, label).
+/usr/bin/python3 - "$OUT" "$VIDEO" "$DURATION" "$DIMS" "$VIDEO_SIZE" "$LABEL" <<'PY'
+import json, os, sys, time, glob
+(out_dir, video, duration, dims, video_size, label) = sys.argv[1:7]
+frame_paths = sorted(glob.glob(os.path.join(out_dir, "frame_*.jpg")))
+now = time.time()
+data = {
+    "source": "screen-video",
+    "ts": now,
+    "timestamp": now,
+    "iso": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+    "duration_seconds": int(duration),
+    "frame_count": len(frame_paths),
+    "video_path": video,
+    "frames": frame_paths,
+    "dims": dims,
+    "video_size_bytes": int(video_size) if video_size.isdigit() else None,
+    "label": label or None,
+    "embedded": False,
+    "compressed": False,
+}
+with open(os.path.join(out_dir, "metadata.json"), "w") as f:
+    json.dump(data, f, indent=2)
+PY
+
+# stdout: directory path. stderr: short summary line.
+echo "$OUT"
+echo "$FRAME_COUNT frames captured from ${DURATION}s video" >&2

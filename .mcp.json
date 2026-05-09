@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "hope-rag": {
+      "command": "/Users/joelc/Documents/Github/Hope/.venv/bin/python",
+      "args": ["-m", "hope.mcp.rag_server"],
+      "env": {
+        "PYTHONUNBUFFERED": "1",
+        "PYTHONPATH": "/Users/joelc/Documents/Github/Hope/src"
+      }
+    }
+  }
+}

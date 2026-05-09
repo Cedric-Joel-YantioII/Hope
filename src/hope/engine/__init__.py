@@ -1,32 +1,16 @@
-"""Inference Engine primitive — LLM runtime management."""
+"""Engine primitive — InferenceEngine ABC and shared response types.
+
+The concrete engine implementations (Ollama, cloud, vLLM, etc.) were
+removed during the voice-arch cleanup. The ABC + runtime dataclasses in
+``_stubs.py`` are still live — subclassed by ``GuardrailsEngine``, test
+fakes, and referenced as runtime types by specialist agents (``rlm``,
+``monitor_operative``, ``deep_research``) and sandbox/security helpers.
+
+If you need a concrete engine, wire one through ``hope.core.registry``.
+"""
 
 from __future__ import annotations
 
-import importlib
+from hope.engine._stubs import InferenceEngine, ResponseFormat, StreamChunk
 
-# Import engine modules to trigger @EngineRegistry.register() decorators
-import hope.engine.claude_code_tmux  # noqa: F401
-import hope.engine.ollama  # noqa: F401
-import hope.engine.openai_compat_engines  # noqa: F401
-from hope.engine._base import (
-    EngineConnectionError,
-    InferenceEngine,
-    messages_to_dicts,
-)
-from hope.engine._discovery import discover_engines, discover_models, get_engine
-
-# Optional engines — only register if their SDK deps are present
-for _optional in ("cloud", "litellm", "gemma_cpp"):
-    try:
-        importlib.import_module(f".{_optional}", __name__)
-    except ImportError:
-        pass
-
-__all__ = [
-    "EngineConnectionError",
-    "InferenceEngine",
-    "discover_engines",
-    "discover_models",
-    "get_engine",
-    "messages_to_dicts",
-]
+__all__ = ["InferenceEngine", "ResponseFormat", "StreamChunk"]

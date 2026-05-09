@@ -1,0 +1,130 @@
+#!/usr/bin/env bash
+# hope-permissions — check & guide macOS TCC grants so Hope works under launchd.
+#
+# When Hope is started from a terminal (e.g. `hope start`), she inherits
+# the terminal's Screen Recording / Accessibility / Automation grants.
+# When she's started by launchd (RunAtLoad), she runs under Python with
+# no prior grants and macOS silently refuses screencapture + osascript.
+# This script probes what works right now and opens the relevant panes
+# in System Settings so the user can grant in one sitting.
+#
+# Usage:
+#   hope-permissions           # check + open settings panes if needed
+#   hope-permissions --check   # check only, no UI
+#   hope-permissions --binary  # print the python binary to grant to
+
+set -euo pipefail
+
+MODE="${1:-default}"
+
+# The binary that actually runs Hope — this is the one macOS tracks in
+# its Transparency/Consent/Control (TCC) database. A venv's `hope`
+# script shebangs to a python3, which resolves to the system Python
+# framework bundle.
+PY_BIN=$(/Users/joelc/Documents/Github/Hope/.venv/bin/python -c 'import sys; print(sys.executable)' 2>/dev/null || echo "")
+# Follow symlinks to the real framework binary — that's what gets the
+# TCC entry.
+if [[ -n "$PY_BIN" && -L "$PY_BIN" ]]; then
+    PY_BIN="$(readlink -f "$PY_BIN" 2>/dev/null || readlink "$PY_BIN")"
+fi
+
+if [[ "$MODE" == "--binary" ]]; then
+    echo "$PY_BIN"
+    exit 0
+fi
+
+echo "Hope permissions check"
+echo "======================"
+echo "Daemon binary (the one macOS TCC tracks):"
+echo "  $PY_BIN"
+echo ""
+
+pass=()
+fail=()
+
+# --- Screen Recording --------------------------------------------------
+tmp_png=$(mktemp -t hope-perm-sr).png
+if screencapture -x -t png "$tmp_png" 2>/dev/null && [[ -s "$tmp_png" ]] \
+   && [[ $(stat -f%z "$tmp_png") -gt 5000 ]]; then
+    # A valid screen capture usually >5KB. A "permission-denied" screencap
+    # returns an all-black tiny PNG or fails outright.
+    pass+=("Screen Recording")
+else
+    fail+=("Screen Recording — needed by hope-see, hope-click, hope-dismiss")
+fi
+rm -f "$tmp_png" 2>/dev/null
+
+# --- Accessibility (System Events for window/UI queries) ---------------
+if osascript -e 'tell application "System Events" to count processes' >/dev/null 2>&1; then
+    pass+=("Accessibility")
+else
+    fail+=("Accessibility — needed by hope-app focus/quit/windows/menu, hope-dismiss")
+fi
+
+# --- Automation: System Events -----------------------------------------
+# Separate from Accessibility on newer macOS; the above osascript check
+# covers it in most setups.
+
+# --- Automation: per-app (App Scripting) --------------------------------
+# A few apps (Terminal, Finder, Safari) trigger their own Automation
+# prompts. We don't probe them here — they surface naturally on first use.
+
+# Print results
+echo "Granted:"
+if (( ${#pass[@]} )); then
+    for p in "${pass[@]}"; do echo "  ✓ $p"; done
+else
+    echo "  (none)"
+fi
+
+echo ""
+echo "Missing:"
+if (( ${#fail[@]} )); then
+    for f in "${fail[@]}"; do echo "  ✗ $f"; done
+else
+    echo "  (none — you're good)"
+fi
+
+if (( ${#fail[@]} == 0 )); then
+    echo ""
+    echo "Hope's daemon has every permission she needs."
+    exit 0
+fi
+
+if [[ "$MODE" == "--check" ]]; then
+    exit 1
+fi
+
+cat <<HOWTO
+
+How to fix
+----------
+Each missing permission needs ONE grant in System Settings against the
+Python binary above. macOS tracks binaries by their literal path, so
+update the entry if Python ever gets upgraded to a new version.
+
+Steps:
+  1. Open System Settings → Privacy & Security
+  2. Click "Screen Recording" (or "Accessibility")
+  3. Click the "+" button, press cmd+shift+G, paste the binary path above
+  4. Toggle it on
+  5. Repeat for each missing permission
+  6. Restart the daemon: launchctl unload ~/Library/LaunchAgents/com.hope.daemon.plist && launchctl load ~/Library/LaunchAgents/com.hope.daemon.plist
+  7. Re-run this script to verify
+
+Opening the right settings panes now...
+HOWTO
+
+# Open the exact subpanes (macOS deep links).
+for f in "${fail[@]}"; do
+    case "$f" in
+        "Screen Recording"*)
+            open "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture" 2>/dev/null || true
+            ;;
+        "Accessibility"*)
+            open "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility" 2>/dev/null || true
+            ;;
+    esac
+done
+
+exit 1

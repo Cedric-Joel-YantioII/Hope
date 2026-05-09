@@ -19,8 +19,6 @@ def test_hope_config_has_speech():
     assert cfg.speech.backend == "auto"
 
 
-def test_hope_system_has_speech_backend():
-    """HopeSystem has a speech_backend attribute."""
-    from hope.system import HopeSystem
-
-    assert "speech_backend" in HopeSystem.__dataclass_fields__
+# The ``hope.system`` façade was removed during voice-arch cleanup.
+# Speech backend wiring now lives on the daemon/brain_session primitives
+# directly, so the old HopeSystem dataclass-field assertion is obsolete.

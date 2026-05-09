@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# hope-iterate — autonomous test → fix → commit loop.
+# Thin shim so any shell / CC session can invoke the Node CLI.
+set -euo pipefail
+exec node "/Users/joelc/Documents/Github/Hope/src/iterate/cli.mjs" "$@"
