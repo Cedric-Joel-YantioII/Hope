@@ -288,6 +288,12 @@ class HopeDaemon:
         # stays warm so resume is instant.
         self._listening_paused = threading.Event()
         self._wake_lock = threading.Lock()
+        # Set the first time the daemon ever processes a wake event,
+        # so the gemma3:4b pre-warm only fires on FIRST wake (not at
+        # daemon boot). Saves 3.4 GB of RAM until Hope is actually
+        # about to be used — critical on 8 GB Macs where eager
+        # pre-warm tipped the system into swap.
+        self._gemma_prewarmed: bool = False
         # Single-slot executor so concurrent transcripts queue rather
         # than racing into the same pane. Lazily built on first speech
         # event — the daemon can still boot in pure-sleep mode without
@@ -538,17 +544,13 @@ class HopeDaemon:
         self._try_start_rag()
         self._try_start_scheduler()
 
-        # Pre-warm the local Gemma model that powers Hope's vision
-        # AND the personality-aware ack generator. Without this the
-        # very first ack after wake pays the full ~7 s cold-load
-        # penalty, blows the 3 s ack budget, and falls back to the
-        # canned pool — which was the user-visible "acks feel odd"
-        # symptom. Done in a worker so daemon boot stays snappy.
-        threading.Thread(
-            target=self._prewarm_gemma,
-            name="hope-gemma-prewarm",
-            daemon=True,
-        ).start()
+        # NOTE: gemma pre-warm DEFERRED to first wake (see _on_wake).
+        # On 8 GB Macs, pre-warming at daemon boot pinned 3.4 GB in
+        # RAM before the user had even spoken, which tipped the
+        # system into swap and made STT + TTS feel sluggish. Lazy
+        # warm at first wake gives the user instant feedback for
+        # the first ack-after-cold-boot (canned) and keeps gemma
+        # warm thereafter via keep_alive=300.
 
         self._started_at = time.time()
         logger.info(
@@ -1176,6 +1178,18 @@ class HopeDaemon:
                 name="hope-wake-brief",
                 daemon=True,
             ).start()
+            # Lazy-warm gemma3:4b on the first wake (NOT at daemon
+            # boot). This way 3.4 GB of model weights only land in
+            # RAM when the user is actually about to use Hope —
+            # critical on 8 GB Macs where pre-warming at boot
+            # pushed the system into swap before the first turn.
+            if not self._gemma_prewarmed:
+                self._gemma_prewarmed = True
+                threading.Thread(
+                    target=self._prewarm_gemma,
+                    name="hope-gemma-prewarm",
+                    daemon=True,
+                ).start()
 
     def _brief_brain_on_unfinished(self) -> None:
         """Send the brain a wake-up briefing of unfinished tasks.
