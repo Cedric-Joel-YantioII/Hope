@@ -1674,7 +1674,13 @@ class HopeDaemon:
             #  3. When the ack does fire, try to generate one with the
             #     small local model (contextual, in Hope's voice). Fall
             #     back to the categorical pool on any failure.
-            _ACK_DELAY_SEC = 0.6
+            # Tighter than the original 0.6 s — short directives (<3s
+            # of speech) need an audible "I heard you" within a beat
+            # of the user's voice ending or it feels like Hope's not
+            # listening. 0.2 s is roughly the floor where the ack
+            # doesn't step on top of the user's last word and is
+            # short enough to feel responsive.
+            _ACK_DELAY_SEC = 0.2
             ack_cancel = threading.Event()
             skip_ack = False
             try:
