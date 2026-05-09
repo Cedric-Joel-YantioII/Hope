@@ -757,15 +757,27 @@ class HopeDaemon:
     def pause_listening(self) -> bool:
         """Stop acting on mic input. Returns True if state changed.
 
-        The mic + whisper stay warm so ``resume_listening()`` is instant.
-        ``_on_speech_transcript`` and the non-manual ``_on_wake`` both
-        drop events while paused. Publishes ``LISTENING_PAUSED`` on the
-        event bus so the dashboard can reflect the state.
+        Fully shuts the STT pipeline down (mic capture + whisper
+        + VAD segmenter) so no CPU is spent transcribing background
+        audio while paused. Trade-off: voice wake ('Hope, wake up')
+        cannot fire while paused — un-mute via the dashboard button
+        or ``hope wake`` from the CLI. Cold-restart on resume is
+        ~1 s. Publishes ``LISTENING_PAUSED`` on the event bus.
         """
         if self._listening_paused.is_set():
             return False
         self._listening_paused.set()
-        logger.info("listening paused")
+        # Shut STT down so whisper isn't burning CPU on TV/podcast
+        # audio. Best-effort — if the backend is already stopped or
+        # absent, the flag alone keeps the dispatch path quiet.
+        if self._speech_backend is not None:
+            try:
+                self._speech_backend.stop()
+                logger.info("listening paused — STT stopped")
+            except Exception:
+                logger.exception("speech_backend.stop() during pause failed")
+        else:
+            logger.info("listening paused")
         try:
             self._bus.publish(EventType.LISTENING_PAUSED, {"timestamp": time.time()})
         except Exception:
@@ -773,11 +785,25 @@ class HopeDaemon:
         return True
 
     def resume_listening(self) -> bool:
-        """Start acting on mic input again. Returns True if state changed."""
+        """Start acting on mic input again. Returns True if state changed.
+
+        Re-spins the STT pipeline that ``pause_listening`` shut down.
+        Idempotent — calling on an already-listening daemon is a
+        no-op.
+        """
         if not self._listening_paused.is_set():
             return False
         self._listening_paused.clear()
-        logger.info("listening resumed")
+        # Bring STT back online. The backend's ``start()`` is
+        # re-entrant per WhisperCppSTT's lifecycle test.
+        if self._speech_backend is not None:
+            try:
+                self._speech_backend.start()
+                logger.info("listening resumed — STT restarted")
+            except Exception:
+                logger.exception("speech_backend.start() on resume failed")
+        else:
+            logger.info("listening resumed")
         try:
             self._bus.publish(EventType.LISTENING_RESUMED, {"timestamp": time.time()})
         except Exception:
