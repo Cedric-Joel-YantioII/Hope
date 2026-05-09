@@ -115,6 +115,11 @@ def gen_ack(transcript: str, *, timeout: Optional[float] = None) -> Optional[str
         "system": _SYSTEM,
         "prompt": transcript.strip(),
         "stream": False,
+        # Gemma3:4b also serves as Hope's vision model — keep it
+        # resident in Ollama indefinitely so a 7+ s cold-load doesn't
+        # blow every ack budget. The model only re-loads if the user
+        # explicitly stops it or memory pressure forces a swap.
+        "keep_alive": -1,
         "options": {
             # Higher temp for genuine variety; 20 tokens ≈ 7–9 words,
             # leaving headroom for the filter's 9-word ceiling.

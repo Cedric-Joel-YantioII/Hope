@@ -538,6 +538,18 @@ class HopeDaemon:
         self._try_start_rag()
         self._try_start_scheduler()
 
+        # Pre-warm the local Gemma model that powers Hope's vision
+        # AND the personality-aware ack generator. Without this the
+        # very first ack after wake pays the full ~7 s cold-load
+        # penalty, blows the 3 s ack budget, and falls back to the
+        # canned pool — which was the user-visible "acks feel odd"
+        # symptom. Done in a worker so daemon boot stays snappy.
+        threading.Thread(
+            target=self._prewarm_gemma,
+            name="hope-gemma-prewarm",
+            daemon=True,
+        ).start()
+
         self._started_at = time.time()
         logger.info(
             "Hope daemon started (sleeping) pid=%d wake_monitor=%s learning=%s",
@@ -559,6 +571,29 @@ class HopeDaemon:
         except Exception:
             logger.exception("RAG backbone failed to initialize")
             self._rag = None
+
+    def _prewarm_gemma(self) -> None:
+        """Send a tiny generate request so Ollama loads gemma3:4b.
+
+        gemma3:4b is dual-purpose for Hope: vision (eyes) AND
+        personality-aware acks. Cold-load is ~7 s on M2; once
+        resident in Ollama with ``keep_alive=-1`` it stays loaded
+        across calls. Best-effort — never raises; if Ollama isn't
+        running, the ack path will retry on each turn.
+        """
+        try:
+            from hope.learning.acks_gemma import gen_ack
+        except Exception:
+            return
+        try:
+            # 30 s budget for the cold load — reasonable on M2 even
+            # under heavy claude-CLI memory pressure.
+            phrase = gen_ack("warmup ping", timeout=30.0)
+            logger.info(
+                "gemma pre-warm complete (sample ack=%r)", phrase,
+            )
+        except Exception:
+            logger.debug("gemma pre-warm failed", exc_info=True)
 
     def _try_start_scheduler(self) -> None:
         """Start the TaskScheduler if ``[scheduler] enabled`` is set.
@@ -1664,7 +1699,11 @@ class HopeDaemon:
                     phrase = None
                     try:
                         from hope.learning.acks_gemma import gen_ack
-                        phrase = gen_ack(text, timeout=0.9)
+                        # Gemma3:4b warm-eval is ~3s on M2; brain
+                        # typically takes 5+s. With keep_alive=-1
+                        # in acks_gemma, the model stays loaded so
+                        # this is the eval-only budget, not load+eval.
+                        phrase = gen_ack(text, timeout=3.0)
                     except Exception:
                         logger.debug("acks_gemma failed", exc_info=True)
                     if ack_cancel.is_set():
