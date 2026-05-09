@@ -24,7 +24,6 @@ import random
 import re
 from typing import Optional, Sequence
 
-
 # ---------------------------------------------------------------------------
 # Pools — grouped by what the user just said. Keep every entry ≤ 8 words,
 # British-voiced, and specific enough that Hope doesn't sound like she's

@@ -96,7 +96,10 @@ def strip_formatting_for_tts(text: str) -> str:
 # Note ✻ overloads — present participle ("✻ Cooking…") is the spinner;
 # past tense ("✻ Cooked for 3s") is a completion marker that lacks U+2026.
 # That is why _is_thinking_line REQUIRES BOTH the glyph AND U+2026.
-_SPINNER_GLYPHS = ("✽", "✶", "✸", "✹", "✺", "✻", "✢", "✣", "✤", "✥", "✦", "✩", "✪", "✫", "✬", "✭", "✮", "✯", "✰")
+_SPINNER_GLYPHS = (
+    "✽", "✶", "✸", "✹", "✺", "✻", "✢", "✣", "✤", "✥",
+    "✦", "✩", "✪", "✫", "✬", "✭", "✮", "✯", "✰",
+)
 # The persistent status bar at the bottom of the pane carries the
 # model label ("Opus 4.7 …") that uses U+2026 even when the brain is
 # idle. Strip the trailing N lines before scanning for live spinners.

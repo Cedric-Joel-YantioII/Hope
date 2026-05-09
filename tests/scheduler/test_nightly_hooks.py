@@ -13,7 +13,6 @@ MagicMocks so we don't spin up tmux or the mic backend.
 
 from __future__ import annotations
 
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest

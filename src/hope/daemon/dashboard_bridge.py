@@ -43,7 +43,7 @@ import struct
 import threading
 import time
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, Iterable, List, Optional, Set
+from typing import Any, Callable, Dict, List, Optional, Set
 
 from hope.core.events import Event, EventBus, EventType, get_event_bus
 

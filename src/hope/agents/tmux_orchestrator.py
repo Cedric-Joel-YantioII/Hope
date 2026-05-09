@@ -41,12 +41,11 @@ import uuid
 from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Deque, Dict, List, Optional, Tuple
-
-from hope.core.config import DEFAULT_CONFIG_DIR, OrchestratorConfig, load_config
-from hope.core.events import EventBus, EventType
+from typing import Any, Callable, Deque, Dict, List, Optional
 
 from hope.agents.specialist_registry import PaneEntry, SpecialistRegistry
+from hope.core.config import DEFAULT_CONFIG_DIR, OrchestratorConfig, load_config
+from hope.core.events import EventBus, EventType
 
 logger = logging.getLogger(__name__)
 

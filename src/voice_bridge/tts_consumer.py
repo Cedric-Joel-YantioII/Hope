@@ -81,7 +81,10 @@ def _load_done_ids(done_path: pathlib.Path) -> set[str]:
     return done
 
 
-def _record_done(done_path: pathlib.Path, record_id: str, status: str, *, error: str | None = None) -> None:
+def _record_done(
+    done_path: pathlib.Path, record_id: str, status: str,
+    *, error: str | None = None,
+) -> None:
     """Append a completion marker so we never re-speak on restart."""
     payload = {
         "id": record_id,

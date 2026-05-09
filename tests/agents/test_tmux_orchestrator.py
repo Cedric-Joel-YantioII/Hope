@@ -9,7 +9,6 @@ are unavailable.
 
 from __future__ import annotations
 
-import os
 import shutil
 import sqlite3
 import subprocess
@@ -28,7 +27,6 @@ from hope.agents.tmux_orchestrator import (
 )
 from hope.core.config import OrchestratorConfig
 from hope.core.events import EventBus, EventType
-
 
 # ---------------------------------------------------------------------------
 # Helpers — fake tmux runner

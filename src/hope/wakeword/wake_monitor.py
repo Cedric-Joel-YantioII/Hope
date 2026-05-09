@@ -29,7 +29,6 @@ from hope.core.events import EventBus, EventType
 from .clap_detector import ClapDetector, ClapDetectorConfig
 from .phrase_matcher import PhraseMatcher
 
-
 logger = logging.getLogger(__name__)
 
 

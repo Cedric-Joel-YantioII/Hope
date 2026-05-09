@@ -14,7 +14,6 @@ import pytest
 
 from hope.wakeword.clap_detector import ClapDetector, ClapDetectorConfig
 
-
 SAMPLE_RATE = 16_000
 FRAME_SAMPLES = 512  # 32 ms at 16 kHz
 FRAME_MS = FRAME_SAMPLES * 1000 // SAMPLE_RATE  # 32

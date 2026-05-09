@@ -15,7 +15,6 @@ import json
 import os
 import socket
 import struct
-import threading
 import time
 
 import pytest
@@ -25,7 +24,6 @@ from hope.daemon.dashboard_bridge import (
     DashboardBridge,
     DashboardBridgeConfig,
 )
-
 
 # ---------------------------------------------------------------------------
 # Tiny stdlib-only WebSocket client (matches what the bridge expects)

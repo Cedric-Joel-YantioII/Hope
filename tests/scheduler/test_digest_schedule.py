@@ -110,7 +110,6 @@ class TestDigestScheduleEndpoints:
         """Create a test client with digest routes."""
         from fastapi import FastAPI
         from fastapi.testclient import TestClient
-
         from hope.server.digest_routes import create_digest_router
 
         app = FastAPI()

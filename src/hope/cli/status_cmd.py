@@ -80,7 +80,7 @@ def status(as_json: bool) -> None:
     lines = [
         f"[green]Hope is running[/green] (PID {state.get('pid', pid)})",
         f"  hope-main pane:    [cyan]{state.get('hope_main_pane_id') or '(none)'}[/cyan]",
-        f"  orchestrator:      "
+        "  orchestrator:      "
         + (
             "[green]started[/green]"
             if state.get("orchestrator_started")
@@ -88,7 +88,7 @@ def status(as_json: bool) -> None:
         ),
         f"  live specialists:  [cyan]{state.get('specialist_count', 0)}[/cyan]",
         f"  queued spawns:     [cyan]{state.get('queued_spawn_count', 0)}[/cyan]",
-        f"  wake monitor:      "
+        "  wake monitor:      "
         + _format_wake(state.get("wake_monitor_available"), state.get("wake_monitor_active")),
         f"  bus socket:        [dim]{state.get('bus_socket') or '(none)'}[/dim]",
         f"  control socket:    [dim]{state.get('control_socket') or '(none)'}[/dim]",

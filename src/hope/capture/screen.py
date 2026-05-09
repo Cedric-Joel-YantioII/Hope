@@ -538,7 +538,7 @@ def _verify_screen_recording_permission(backend: str) -> None:
             "Grant access in System Settings → Privacy & Security → Screen "
             f"Recording, then restart Hope. ({exc})"
         ) from exc
-    except Exception as exc:
+    except Exception:
         # Non-permission errors (e.g. missing mss) bubble up unchanged.
         raise
 

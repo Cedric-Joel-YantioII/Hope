@@ -157,7 +157,6 @@ def run(
 
     # 1. Drain the async queue first so placeholder_ids() settles.
     try:
-        from hope.tools.storage.async_embedder import get_async_embedder
         # We don't create a queue if none exists — embedder is None-safe.
         import hope.tools.storage.async_embedder as _aq_mod
         if _aq_mod._GLOBAL_QUEUE is not None:

@@ -9,7 +9,6 @@ import pytest
 from hope.core.events import EventBus, EventType
 from hope.wakeword.phrase_matcher import PhraseMatcher
 
-
 DEFAULT_PHRASES = ["wake up hope", "hey hope", "hope wake up", "ok hope"]
 
 

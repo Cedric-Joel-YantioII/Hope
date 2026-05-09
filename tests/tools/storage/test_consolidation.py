@@ -11,7 +11,6 @@ These tests exercise the full path:
 
 from __future__ import annotations
 
-import threading
 import time
 from typing import Any, List
 

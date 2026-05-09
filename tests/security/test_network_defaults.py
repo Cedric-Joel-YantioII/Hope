@@ -104,7 +104,6 @@ class TestCORSConfiguration:
         from unittest.mock import MagicMock
 
         from fastapi.testclient import TestClient
-
         from hope.server.app import create_app
 
         mock_engine = MagicMock()

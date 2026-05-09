@@ -29,7 +29,6 @@ from hope.vision import gemma_vision as gv
 from hope.vision.gemma_vision import GemmaVision
 from hope.vision.model_loader import MlxVisionLoader
 
-
 # ---------------------------------------------------------------------------
 # Tiny PNG fixture — 64x64 solid white, hand-rolled so we don't need Pillow
 # to run the fast tests.

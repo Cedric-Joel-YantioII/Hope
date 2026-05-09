@@ -15,7 +15,6 @@ Covers the three behaviours called out in the design brief:
 from __future__ import annotations
 
 import textwrap
-import threading
 import time
 from pathlib import Path
 from typing import List
@@ -31,7 +30,6 @@ from hope.skills.manager import SkillManager
 from hope.skills.tool_adapter import SkillTool
 from hope.skills.watcher import SkillWatcher, _is_skill_relevant
 from hope.tools._stubs import BaseTool, ToolExecutor, ToolSpec
-
 
 # ---------------------------------------------------------------------------
 # Helpers

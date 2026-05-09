@@ -6,12 +6,10 @@ import json
 import time
 from unittest.mock import patch
 
-import pytest
-
 from hope.learning import voice_learning_loop as vll
 from hope.learning.voice_learning_loop import (
-    VoiceLearningLoop,
     LoopConfig,
+    VoiceLearningLoop,
     evolve_acks,
     evolve_wake_phrases,
     load_acks,

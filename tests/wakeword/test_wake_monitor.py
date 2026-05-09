@@ -8,7 +8,7 @@ to exercise the voice path.
 from __future__ import annotations
 
 import time
-from typing import Callable, List, Optional
+from typing import Callable, List
 
 import numpy as np
 import pytest
@@ -16,7 +16,6 @@ import pytest
 from hope.core.config import WakeConfig
 from hope.core.events import Event, EventBus, EventType
 from hope.wakeword import WakeMonitor, WakeSource
-
 
 SAMPLE_RATE = 16_000
 FRAME_SAMPLES = 512

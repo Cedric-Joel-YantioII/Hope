@@ -8,9 +8,8 @@ fastapi = pytest.importorskip("fastapi")
 starlette = pytest.importorskip("starlette")
 
 from fastapi import FastAPI  # noqa: E402
-from starlette.testclient import TestClient  # noqa: E402
-
 from hope.server.api_routes import learning_router  # noqa: E402
+from starlette.testclient import TestClient  # noqa: E402
 
 
 def _make_app() -> FastAPI:

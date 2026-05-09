@@ -26,7 +26,6 @@ from hope.core.registry import SpeechRegistry
 from hope.speech._stubs import TranscriptionResult
 from hope.speech.whisper_cpp import WhisperCppSTT
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

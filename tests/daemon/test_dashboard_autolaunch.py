@@ -21,14 +21,10 @@ from __future__ import annotations
 
 import subprocess
 from pathlib import Path
-from typing import Any
 from unittest.mock import MagicMock
-
-import pytest
 
 from hope.core.config import DashboardConfig
 from hope.daemon.core import HopeDaemon
-
 
 # ---------------------------------------------------------------------------
 # Helpers

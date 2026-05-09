@@ -34,7 +34,6 @@ from hope.daemon.dashboard_bridge import (
     DashboardBridgeConfig,
 )
 
-
 # ---------------------------------------------------------------------------
 # Stdlib-only WebSocket client (matches what ``dashboard_bridge.py`` expects)
 # ---------------------------------------------------------------------------

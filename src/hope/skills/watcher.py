@@ -29,9 +29,9 @@ from __future__ import annotations
 import logging
 import threading
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Dict, List, Optional
 
-from hope.core.events import Event, EventBus, EventType
+from hope.core.events import EventBus, EventType
 
 if TYPE_CHECKING:
     from hope.skills.manager import SkillManager

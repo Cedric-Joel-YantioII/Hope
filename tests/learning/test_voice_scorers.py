@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from hope.learning.voice_scorers import (
     score_correction,
-    score_error,
-    score_repetition,
     score_satisfaction,
     score_turn,
     score_window,

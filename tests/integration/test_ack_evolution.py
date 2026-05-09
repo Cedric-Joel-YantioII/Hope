@@ -10,21 +10,17 @@ from __future__ import annotations
 
 import json
 import time
-from pathlib import Path
-
-import pytest
 
 from hope.learning import voice_learning_loop as vll
 from hope.learning.voice_learning_loop import (
     DEFAULT_ACKS,
-    VoiceLearningLoop,
     LoopConfig,
+    VoiceLearningLoop,
     evolve_acks,
     load_acks,
     save_acks,
 )
 from hope.traces.voice_trace import VoiceTraceStore, VoiceTurn
-
 
 BAD_ACK = "Sounds good."
 GOOD_ACK = "Sure, let me take a look."  # one of DEFAULT_ACKS

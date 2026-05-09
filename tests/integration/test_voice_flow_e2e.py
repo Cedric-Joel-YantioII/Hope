@@ -22,8 +22,8 @@ import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, List, Optional
-from unittest.mock import MagicMock, patch
+from typing import List, Optional
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -31,7 +31,6 @@ from hope.core import config as _cfg_mod
 from hope.core.events import EventBus, EventType
 from hope.daemon.core import HopeDaemon
 from hope.traces.voice_trace import VoiceTraceStore
-
 
 # ---------------------------------------------------------------------------
 # Fakes — mirror the patterns in tests/agents/test_tmux_orchestrator.py and

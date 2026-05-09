@@ -25,7 +25,6 @@ from typing import Callable, Iterable, List, Optional
 
 from hope.core.events import Event, EventBus, EventType
 
-
 logger = logging.getLogger(__name__)
 
 

@@ -7,7 +7,7 @@ import shutil
 import subprocess
 import time
 from dataclasses import dataclass
-from typing import Any, List, Optional
+from typing import List, Optional
 
 import pytest
 
@@ -17,7 +17,6 @@ from hope.voice.brain_session import (
     strip_ansi,
     strip_formatting_for_tts,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fakes — a minimal orchestrator stub with registry + tmux runner recording.
@@ -230,7 +229,7 @@ def _pane_after_reply(message: str, reply: str) -> str:
 def test_send_returns_reply_when_pane_becomes_ready():
     # Poll 1: still thinking. Poll 2: done.
     outputs = [
-        f"❯ hi\n(esc to interrupt)\n",
+        "❯ hi\n(esc to interrupt)\n",
         _pane_after_reply("hi", "Hello there."),
     ]
     orch = FakeOrchestrator(pane_outputs=outputs)

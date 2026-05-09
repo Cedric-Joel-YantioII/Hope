@@ -1762,7 +1762,8 @@ class HopeDaemon:
 
         def _loop() -> None:
             from hope.memory.commitments import (
-                next_recall_candidate, mark_reminded,
+                mark_reminded,
+                next_recall_candidate,
             )
             while not self._recall_stop.wait(timeout=interval):
                 try:

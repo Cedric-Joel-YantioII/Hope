@@ -165,7 +165,10 @@ class MlxVisionLoader:
                     self._repo,
                     time.monotonic() - t0,
                 )
-                return LoadedModel(model=model, processor=processor, config=config, backend="mlx_vlm")
+                return LoadedModel(
+                    model=model, processor=processor,
+                    config=config, backend="mlx_vlm",
+                )
 
             if backend == "mlx_lm":
                 from mlx_lm import load as lm_load  # type: ignore
