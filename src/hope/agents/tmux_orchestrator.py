@@ -1033,9 +1033,9 @@ class TmuxOrchestrator:
     def _accept_bypass_warning(
         self, target: str, *, max_wait_sec: float = 8.0
     ) -> bool:
-        """Auto-accept Claude Code's blocking startup prompts.
+        """Auto-accept / dismiss Claude Code's blocking startup prompts.
 
-        Covers two distinct prompts Claude Code may show on first launch:
+        Covers every blocking pre-prompt screen Claude Code may show:
 
         1. ``--dangerously-skip-permissions`` warning — default cursor on
            "1. No, exit", so we send ``Down`` then ``Enter`` to pick
@@ -1043,12 +1043,20 @@ class TmuxOrchestrator:
         2. Folder trust prompt ("Is this a project you created or one you
            trust?") — default cursor already on "1. Yes, I trust this
            folder", so we send just ``Enter``.
+        3. Claude Code 2.1.137+ "Welcome back / What's new" splash —
+           a banner shown on every launch; dismissed by Enter.
+        4. Gemini CLI "update available" / first-run trust prompts —
+           dismissed by ``n`` then ``Enter`` (skip update) or just Enter
+           (continue with current version).
 
         Polls the pane for up to ``max_wait_sec`` seconds and sends the
-        appropriate keys exactly once when a prompt is detected. Returns
-        True if it took action.
+        appropriate keys exactly once per prompt class. Returns True if
+        any action was taken. May fire MULTIPLE times if the CLI stacks
+        prompts (release-notes splash → bypass warning → trust prompt).
         """
         deadline = time.monotonic() + max_wait_sec
+        dismissed_classes: set[str] = set()
+        any_dismissed = False
         while time.monotonic() < deadline:
             try:
                 result = self._tmux(
@@ -1059,7 +1067,11 @@ class TmuxOrchestrator:
             except Exception:
                 pane = ""
             # Bypass-permissions warning: cursor on "No, exit" → Down then Enter
-            if "2. Yes, I accept" in pane and "Enter to confirm" in pane:
+            if (
+                "bypass" not in dismissed_classes
+                and "2. Yes, I accept" in pane
+                and "Enter to confirm" in pane
+            ):
                 self._tmux(
                     ["tmux", "send-keys", "-t", target, "Down"],
                     check=False,
@@ -1072,9 +1084,16 @@ class TmuxOrchestrator:
                 logger.info(
                     "auto-accepted bypass-permissions warning on %s", target
                 )
-                return True
+                dismissed_classes.add("bypass")
+                any_dismissed = True
+                time.sleep(0.6)  # let the next screen render before re-poll
+                continue
             # Folder trust prompt: cursor already on "Yes, I trust" → Enter only
-            if "Yes, I trust this folder" in pane and "Enter to confirm" in pane:
+            if (
+                "trust" not in dismissed_classes
+                and "Yes, I trust this folder" in pane
+                and "Enter to confirm" in pane
+            ):
                 self._tmux(
                     ["tmux", "send-keys", "-t", target, "Enter"],
                     check=False,
@@ -1082,9 +1101,55 @@ class TmuxOrchestrator:
                 logger.info(
                     "auto-accepted folder-trust prompt on %s", target
                 )
-                return True
+                dismissed_classes.add("trust")
+                any_dismissed = True
+                time.sleep(0.6)
+                continue
+            # Claude Code 2.1.137+ "Welcome back / What's new" splash.
+            # The banner blocks input until you press Enter (or any key on
+            # newer builds). Detected by the box-drawing combo plus either
+            # the welcome text or the release-notes hint.
+            if (
+                "welcome" not in dismissed_classes
+                and "╭───" in pane
+                and (
+                    "Welcome back" in pane
+                    or "release-notes" in pane
+                    or "What's new" in pane
+                )
+            ):
+                self._tmux(
+                    ["tmux", "send-keys", "-t", target, "Enter"],
+                    check=False,
+                )
+                logger.info("dismissed Welcome/What's-new splash on %s", target)
+                dismissed_classes.add("welcome")
+                any_dismissed = True
+                time.sleep(0.6)
+                continue
+            # Gemini CLI update / first-run prompts.
+            #   "Gemini CLI update available! ... Press n to skip / y to update"
+            # We pick "n" so a slow npm update doesn't block the kickoff.
+            if (
+                "gemini-update" not in dismissed_classes
+                and "Gemini CLI update available" in pane
+            ):
+                self._tmux(
+                    ["tmux", "send-keys", "-t", target, "n"],
+                    check=False,
+                )
+                time.sleep(0.15)
+                self._tmux(
+                    ["tmux", "send-keys", "-t", target, "Enter"],
+                    check=False,
+                )
+                logger.info("declined Gemini CLI update prompt on %s", target)
+                dismissed_classes.add("gemini-update")
+                any_dismissed = True
+                time.sleep(0.6)
+                continue
             time.sleep(0.3)
-        return False
+        return any_dismissed
 
     def capture_pane(self, pane_id: str, lines: int = 200) -> str:
         """Return the last *lines* of scrollback from the pane as plain text.
