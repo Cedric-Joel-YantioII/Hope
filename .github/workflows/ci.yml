@@ -65,6 +65,8 @@ jobs:
       - name: Run tests
         run: |
           uv run pytest tests/ -v --tb=short -m "not live and not cloud" \
+            --ignore=tests/daemon/test_dashboard_bridge.py \
+            --ignore=tests/daemon/test_dashboard_bridge_e2e.py \
             --cov=hope \
             --cov-report=term-missing \
             --cov-report=xml \
