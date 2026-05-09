@@ -874,6 +874,10 @@ class TmuxOrchestrator:
             header = f"---HOPE_PANE_REQ_{corr}>>>>"
             footer = f"---HOPE_PANE_END_{corr}>>>>"
             ctx_json = json.dumps(context, default=str)
+            # Absolute timestamp so the agent knows when the kickoff
+            # was issued. LLM brains have no clock — every input has
+            # to carry one or they can't reason about freshness.
+            now_str = time.strftime("%Y-%m-%d %H:%M:%S %z", time.localtime())
             # Snapshot of every other live specialist so this agent
             # knows who is on the team RIGHT NOW. Listening for and
             # sending bus messages is much more useful when each agent
@@ -884,16 +888,16 @@ class TmuxOrchestrator:
                 # task into the first user message. Single line.
                 role_blob = " ".join(rendered_prompt.split())
                 body = (
-                    f"{header} ROLE: {role_blob} TASK: {task} "
-                    f"CONTEXT: {ctx_json} TEAM: {roster_blurb} "
+                    f"{header} TIME: {now_str}. ROLE: {role_blob} "
+                    f"TASK: {task} CONTEXT: {ctx_json} TEAM: {roster_blurb} "
                     f"PROTOCOL: emit exactly {footer} when fully done."
                 )
             else:
                 # Claude/gemini already loaded the role via system prompt;
                 # this is the framed kickoff in one line.
                 body = (
-                    f"{header} Task: {task}. Context: {ctx_json}. "
-                    f"Team: {roster_blurb}. "
+                    f"{header} Time: {now_str}. Task: {task}. "
+                    f"Context: {ctx_json}. Team: {roster_blurb}. "
                     f"Reply protocol: when fully done, emit exactly {footer}."
                 )
             # Send-keys -l (literal) so the body lands intact, then
@@ -1422,8 +1426,16 @@ class TmuxOrchestrator:
         abort fan-out to other subscribers.
         """
         try:
+            # Bus messages always carry an absolute timestamp so the
+            # receiving agent knows WHEN the sender spoke. LLM-backed
+            # agents have no clock; without this they can't reason
+            # about "did this just arrive or was it queued an hour ago?"
+            stamp = time.strftime(
+                "%Y-%m-%d %H:%M:%S %z", time.localtime(envelope.get("timestamp") or time.time()),
+            )
             banner = (
-                f"[Hope bus] from={envelope.get('from_role') or envelope.get('from')} "
+                f"[Hope bus {stamp}] "
+                f"from={envelope.get('from_role') or envelope.get('from')} "
                 f"topic={envelope.get('topic')} "
                 f"corr={envelope.get('correlation_id') or '-'}"
             )

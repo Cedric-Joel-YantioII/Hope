@@ -237,10 +237,15 @@ class BrainSession:
                 return ""
             target = entry.tmux_target
 
+            # Prepend an absolute + ISO local timestamp so the brain
+            # always knows when the user spoke (LLMs have no clock).
+            # Format: "[2026-05-09 13:14:08 -0500] <message>".
+            stamp = time.strftime("%Y-%m-%d %H:%M:%S %z", time.localtime())
+            stamped = f"[{stamp}] {message}"
             # send-keys -l (literal) so shell metachars in the transcript
             # don't get interpreted; followed by Enter to submit.
             r1 = self._orchestrator._tmux(
-                ["tmux", "send-keys", "-t", target, "-l", "--", message],
+                ["tmux", "send-keys", "-t", target, "-l", "--", stamped],
                 check=False,
             )
             r2 = self._orchestrator._tmux(
@@ -267,7 +272,10 @@ class BrainSession:
             deadline = time.monotonic() + self._send_timeout_sec
             response = ""
             poll_count = 0
-            message_prefix = message[:40]
+            # Match against a stable substring of the actual sent text
+            # (which now starts with the timestamp prefix) so the
+            # response-extraction needle still anchors correctly.
+            message_prefix = stamped[:40] if len(stamped) >= 40 else stamped
 
             while time.monotonic() < deadline:
                 time.sleep(self._poll_interval_sec)
@@ -289,7 +297,7 @@ class BrainSession:
                     )
 
                 if has_ready_prompt(cleaned) and message_prefix in cleaned:
-                    response = self._extract_response(cleaned, message)
+                    response = self._extract_response(cleaned, stamped)
                     if response:
                         break
 

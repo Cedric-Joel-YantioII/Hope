@@ -222,8 +222,17 @@ def test_extract_response_joins_multiple_prose_lines():
 # ---------------------------------------------------------------------------
 
 
+def _stamp(message: str) -> str:
+    """Mirror BrainSession.send's timestamp-prefix logic for fixtures."""
+    import time
+    return f"[{time.strftime('%Y-%m-%d %H:%M:%S %z', time.localtime())}] {message}"
+
+
 def _pane_after_reply(message: str, reply: str) -> str:
-    return f"❯ {message}\n⏺ {reply}\n❯ "
+    """Render a pane fixture as if Hope had sent ``message`` (with the
+    timestamp prefix that production now adds) and the brain replied.
+    """
+    return f"❯ {_stamp(message)}\n⏺ {reply}\n❯ "
 
 
 def test_send_returns_reply_when_pane_becomes_ready():
@@ -241,9 +250,14 @@ def test_send_returns_reply_when_pane_becomes_ready():
     )
     reply = session.send("hi")
     assert reply == "Hello there."
-    # send-keys -l + Enter were dispatched.
+    # send-keys -l + Enter were dispatched. The literal payload now
+    # carries a leading timestamp prefix, so we check the last cmd
+    # element ENDS WITH the original message rather than equals it.
     sent_cmds = [c for c in orch.tmux_calls if "send-keys" in c]
-    assert any("-l" in c and "hi" in c for c in sent_cmds)
+    assert any(
+        "-l" in c and isinstance(c[-1], str) and c[-1].endswith("hi")
+        for c in sent_cmds
+    )
     assert any(c[-1] == "Enter" for c in sent_cmds)
 
 

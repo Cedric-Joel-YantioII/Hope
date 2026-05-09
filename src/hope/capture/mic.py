@@ -35,7 +35,11 @@ except ImportError:  # pragma: no cover - numpy is effectively mandatory
 
 try:
     import sounddevice as sd
-except ImportError:
+except (ImportError, OSError):
+    # OSError fires on Linux runners without the PortAudio shared lib
+    # (CI, headless servers). Treat it like ImportError so module
+    # import still succeeds; .start() will raise a clearer error if
+    # mic capture is actually attempted.
     sd = None  # type: ignore[assignment]
 
 try:
