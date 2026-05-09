@@ -88,6 +88,14 @@ class VADConfig:
     pre_roll_ms: int = 200  # Audio retained BEFORE detected speech onset
     post_roll_ms: int = 500  # Audio retained AFTER speech offset
     min_speech_ms: int = 250  # Drop segments shorter than this (noise)
+    # Hard cap on segment length. Without this, continuous background
+    # audio (TV, podcast playing through the speakers, a long
+    # monologue) keeps appending to the same segment for minutes —
+    # whisper then chokes on the giant chunk and the user sees a wall
+    # of text arrive seconds late. 6 s is enough room for a normal
+    # spoken sentence and short enough that the user-perceived
+    # latency stays under a second on M-series Macs.
+    max_speech_ms: int = 6000
 
 
 # ---------------------------------------------------------------------------
@@ -342,6 +350,15 @@ class VADGatedSegmenter:
             state.pre_roll.clear()
         state.current.append(pcm)
         state.silence_ms = 0.0
+        # Hard cap: if the current segment has been speech for more
+        # than ``max_speech_ms``, force-finalize so whisper doesn't
+        # choke on a multi-minute chunk. The next frame just starts
+        # a fresh segment — no audio is lost.
+        if self._vad_cfg.max_speech_ms > 0:
+            current_bytes = sum(len(p) for p in state.current)
+            current_ms = current_bytes / 2 / SAMPLE_RATE_HZ * 1000.0
+            if current_ms >= self._vad_cfg.max_speech_ms:
+                self._finalize(state)
 
     def _on_silence(
         self, state: _SegmenterState, pcm: bytes, frame_ms: float

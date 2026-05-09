@@ -953,13 +953,27 @@ class HopeDaemon:
         source = payload.get("source", "unknown")
         logger.info("WAKE_TRIGGER received source=%s", source)
 
-        # Listening paused? Don't wake from background audio.
-        # A "manual" source (the user explicitly ran `hope wake` or
-        # clicked the dashboard button) still fires — so the user can
-        # always override.
-        if self._listening_paused.is_set() and source != "manual":
-            logger.info("wake ignored — listening paused (source=%s)", source)
-            return
+        # Listening paused? A wake from VOICE or CLAP is deliberate
+        # user intent ("Hope, wake up" / two claps) — auto-resume
+        # listening AND fall through. Mirrors what
+        # ``_on_speech_transcript`` already does for wake-prefix
+        # transcripts during pause. Only an "unknown" source (or any
+        # source we explicitly want to gate) is ignored.
+        if self._listening_paused.is_set():
+            if source in ("voice", "clap", "manual"):
+                if source != "manual":
+                    self.resume_listening()
+                    logger.info(
+                        "wake while paused — auto-resuming "
+                        "(source=%s, deliberate user intent)",
+                        source,
+                    )
+                # Fall through into the wake flow.
+            else:
+                logger.info(
+                    "wake ignored — listening paused (source=%s)", source,
+                )
+                return
 
         orch = self._orchestrator
         if orch is None:
