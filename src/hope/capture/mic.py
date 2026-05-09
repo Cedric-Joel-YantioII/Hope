@@ -84,12 +84,11 @@ class VADConfig:
     """Tunables for the silero-VAD gate."""
 
     threshold: float = 0.5  # Speech probability cutoff (0..1)
-    # Trailing silence before finalizing a segment. 250 ms is enough
-    # to ride out natural breath gaps inside a sentence but short
-    # enough that the user doesn't perceive a "dead air" pause
-    # between speaking and Hope reacting. The previous 500 ms felt
-    # noticeably laggy on short directives (<3 s).
-    min_silence_ms: int = 250
+    # 500 ms of trailing silence before a segment is finalized. The
+    # user prefers this longer wait — it leaves room to add a clause
+    # mid-thought without the segmenter chopping the utterance. End-
+    # of-speech detection latency is the price; well worth it.
+    min_silence_ms: int = 500
     pre_roll_ms: int = 200  # Audio retained BEFORE detected speech onset
     post_roll_ms: int = 500  # Audio retained AFTER speech offset
     min_speech_ms: int = 250  # Drop segments shorter than this (noise)
