@@ -115,11 +115,14 @@ def gen_ack(transcript: str, *, timeout: Optional[float] = None) -> Optional[str
         "system": _SYSTEM,
         "prompt": transcript.strip(),
         "stream": False,
-        # Gemma3:4b also serves as Hope's vision model — keep it
-        # resident in Ollama indefinitely so a 7+ s cold-load doesn't
-        # blow every ack budget. The model only re-loads if the user
-        # explicitly stops it or memory pressure forces a swap.
-        "keep_alive": -1,
+        # Keep the model warm for 5 minutes after each call so
+        # back-to-back turns don't pay the cold-load cost. Set to
+        # an int (not -1) on purpose: an 8 GB Mac can't afford to
+        # pin 4.18 GB indefinitely — it tips the system into swap
+        # and turns STT + TTS into SSD-paging contests. 5 min is
+        # the sweet spot: stays warm during a conversation, frees
+        # RAM during long idle.
+        "keep_alive": 300,
         "options": {
             # Higher temp for genuine variety; 20 tokens ≈ 7–9 words,
             # leaving headroom for the filter's 9-word ceiling.
