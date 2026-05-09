@@ -48,7 +48,10 @@ Thumbs.db
 *.log
 results/
 logs/
-traces/
+/traces/
+# (the package src/hope/traces/ is intentionally tracked; the rule
+# above is anchored with a leading slash so only the top-level
+# `traces/` runtime-output directory is ignored.)
 coding_task_*
 get-pip.py
 # Junk from mocked-path tests that write to their mock's __repr__ as a path
