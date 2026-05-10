@@ -125,20 +125,44 @@ export const useDashboardStore = create<DashboardStore>((set) => ({
           };
         }
         case 'speaking_started': {
-          // Hope's TTS started. Override any other state so the orb
-          // immediately switches to the green speaking palette.
-          return { brainState: 'speaking' };
+          // Hope's TTS started — orb shows the green speaking palette.
+          // Keep brainBusy unchanged: an ack speaking on top of an
+          // in-flight brain turn must NOT clear the busy flag, or the
+          // speaking_ended handler below will drop us to idle instead
+          // of falling back to thinking.
+          return {
+            brainState: 'speaking',
+            echo: { ...state.echo, speaking: true },
+          };
         }
         case 'speaking_ended': {
-          // Drop back to idle so the orb stops the speaking envelope.
-          return { brainState: 'idle' };
+          // TTS finished. If the brain is still working (the ack just
+          // ended but the actual reply hasn't landed yet), the orb
+          // should return to "Thinking…" rather than going idle and
+          // pretending Hope is done. Without this check the user sees
+          // the orb go calm during the long silent middle of a turn
+          // and reasonably concludes she stopped working.
+          const stillThinking = state.echo.brainBusy;
+          return {
+            brainState: stillThinking ? 'thinking' : 'idle',
+            echo: { ...state.echo, speaking: false },
+          };
         }
         case 'agent_turn_start':
         case 'inference_start':
-          return { brainState: 'thinking' };
+          return {
+            brainState: state.echo.speaking ? 'speaking' : 'thinking',
+            echo: { ...state.echo, brainBusy: true },
+          };
         case 'agent_turn_end':
         case 'inference_end':
-          return { brainState: 'idle' };
+          return {
+            // If TTS is still in flight (the reply is being spoken),
+            // keep showing speaking. Otherwise the turn is fully done
+            // and the orb returns to idle.
+            brainState: state.echo.speaking ? 'speaking' : 'idle',
+            echo: { ...state.echo, brainBusy: false },
+          };
         case 'pane_spawned': {
           const paneId = String(data.pane_id ?? data.paneId ?? uid());
           const role = String(data.role ?? data.pane_name ?? 'specialist');

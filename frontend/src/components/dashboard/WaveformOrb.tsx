@@ -247,8 +247,8 @@ export function WaveformOrb({ brainState, listeningPaused, size = 320 }: Props) 
 
   return (
     <div
-      className="relative flex flex-col items-center justify-center"
-      style={{ width: size, height: size + 36 }}
+      className="relative flex items-center justify-center"
+      style={{ width: size, height: size }}
       aria-label={`Hope ${brainState}`}
     >
       <canvas
@@ -261,10 +261,12 @@ export function WaveformOrb({ brainState, listeningPaused, size = 320 }: Props) 
       />
       {labelText && (
         <div
-          className="mt-2 text-sm font-medium tracking-[0.18em] uppercase"
+          className="absolute pointer-events-none text-base font-medium tracking-[0.22em] uppercase"
           style={{
-            color: `hsl(${labelTone.hue} ${labelTone.sat}% ${labelTone.ring}%)`,
-            textShadow: '0 0 12px rgba(0,0,0,0.45)',
+            color: `hsl(${labelTone.hue} ${labelTone.sat}% ${Math.min(labelTone.ring + 25, 88)}%)`,
+            textShadow:
+              '0 0 8px rgba(0,0,0,0.55), 0 0 18px rgba(0,0,0,0.35)',
+            letterSpacing: '0.22em',
             opacity: 0.95,
           }}
         >
