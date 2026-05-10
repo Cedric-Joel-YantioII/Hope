@@ -231,14 +231,11 @@ export function WaveformOrb({ brainState, listeningPaused, size = 320 }: Props) 
     };
   }, [size]);
 
-  // Human-readable state text shown beneath the orb. Idle stays
-  // intentionally bare so a quiet workspace is, well, quiet — but every
-  // active state gets a clear, sentence-cased label so the user can tell
-  // at a glance what Hope is doing during the silent window between her
-  // ack and her reply.
+  // Human-readable state text shown inside the orb. Every state gets a
+  // label so the user can always tell at a glance what Hope is doing.
   const stateLabel: Record<BrainState, string> = {
     sleeping: 'Sleeping',
-    idle: '',
+    idle: 'Idle',
     thinking: 'Thinking…',
     speaking: 'Speaking',
   };
