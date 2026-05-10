@@ -206,6 +206,23 @@ def test_extract_response_strips_esc_to_interrupt_line():
     assert got == "Hi there."
 
 
+def test_extract_response_returns_empty_when_no_agent_bullet():
+    # Race: the brain hasn't started replying yet but a stale ❯ from the
+    # previous turn is still in the pane, AND the just-typed user message
+    # word-wrapped onto a second line below the matched-prefix line.
+    # Without the ⏺ guard the wrap continuation gets returned as if it
+    # were the agent reply.
+    pane = (
+        "❯ tell me a long story about how you spent your weekend at\n"
+        "the cabin near the lake\n"
+        "❯ "
+    )
+    got = BrainSession._extract_response(
+        pane, "tell me a long story about how you spent your weekend at"
+    )
+    assert got == ""
+
+
 def test_extract_response_joins_multiple_prose_lines():
     pane = (
         "❯ tell me a story\n"

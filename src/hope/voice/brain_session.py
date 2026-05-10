@@ -178,8 +178,15 @@ class BrainSession:
     object holds no mutable state beyond construction args.
     """
 
-    # Defaults mirror the TS constants so behavior is identical across ports.
-    POLL_INTERVAL_SEC = 0.5
+    # 100 ms keeps end-of-turn detection near the floor of human-perceptible
+    # delay (~80 ms) without flooring tmux capture-pane. The TS port runs
+    # 500 ms; we diverge intentionally because the daemon is the one piece
+    # of the pipeline that ALWAYS runs on the same box as the user. With
+    # 100 ms polling, the natural "spinner gone → prompt back" window in
+    # Claude Code 2.x already gives us streaming-like behaviour for free —
+    # the brain's prose is captured within a beat of being final, so a
+    # separate streaming path isn't worth its complexity.
+    POLL_INTERVAL_SEC = 0.1
     # Multi-step actions (Chrome navigation + osascript + screenshot
     # verification) regularly run 5+ minutes. The old 60s ceiling caused
     # the daemon to silently bail with an empty reply while the brain
@@ -276,6 +283,8 @@ class BrainSession:
             # (which now starts with the timestamp prefix) so the
             # response-extraction needle still anchors correctly.
             message_prefix = stamped[:40] if len(stamped) >= 40 else stamped
+            # Heartbeat cadence is poll-rate dependent — log every ~10 s.
+            heartbeat_every = max(1, int(round(10.0 / self._poll_interval_sec)))
 
             while time.monotonic() < deadline:
                 time.sleep(self._poll_interval_sec)
@@ -285,9 +294,8 @@ class BrainSession:
                 cleaned = strip_ansi(raw)
                 poll_count += 1
 
-                # Heartbeat every ~10s (20 polls at 500ms) so logs show
-                # the loop is alive while Claude thinks.
-                if poll_count % 20 == 0:
+                # Heartbeat so logs show the loop is alive while Claude thinks.
+                if poll_count % heartbeat_every == 0:
                     elapsed = int(
                         self._send_timeout_sec
                         - (deadline - time.monotonic())
@@ -347,6 +355,17 @@ class BrainSession:
                 break
 
         response_lines = lines[message_line_index + 1 : prompt_line_index]
+
+        # A real agent turn always emits at least one ⏺-prefixed line.
+        # Without this guard, when the brain hasn't started replying yet
+        # AND the pane already shows a stale "❯" from the previous turn,
+        # any wrap-continuation of the user message that lands below the
+        # match line gets returned as if it were the agent reply.
+        # Tightening the poll interval to 100 ms made this race far more
+        # frequent, so we now require a positive signal from the agent
+        # before considering the slice valid.
+        if not any(rl.lstrip().startswith("⏺") for rl in response_lines):
+            return ""
 
         kept: list[str] = []
         for raw_line in response_lines:
