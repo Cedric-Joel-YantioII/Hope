@@ -121,6 +121,52 @@ fn spawn_daemon() -> Result<Child, String> {
         .map_err(|e| format!("spawn daemon: {}", e))
 }
 
+/// Tell an already-running daemon (one we don't own — usually a leftover
+/// from a previous Hope.app session, the disabled launchd plist, or a
+/// manual `hope start` for testing) to shut itself down via the Unix
+/// control socket. Polls until the bridge port is free again, capped at
+/// `max_wait`. Returns Err on socket failure or wait timeout.
+///
+/// The daemon's `stop` command runs `HopeDaemon.shutdown()` on a worker
+/// thread (closes the tmux session, kills specialist panes, drops the
+/// dashboard bridge, removes the PID file) and exits the Python process.
+/// On a healthy daemon this is well under a second; we give 5 s of
+/// headroom for slow machines / paused brains.
+fn stop_existing_daemon() -> Result<(), String> {
+    // Best-effort send. If the socket is missing/unreachable we still
+    // try the port-clear poll below — maybe the daemon is in a half-up
+    // state where the control socket is gone but the bridge port is
+    // still bound by a zombie listener.
+    let sent = send_control_sync("stop", None);
+    match sent {
+        Ok(_) => eprintln!("[hope-desktop] sent stop to existing daemon"),
+        Err(e) => eprintln!(
+            "[hope-desktop] stop command failed ({}); polling port anyway",
+            e,
+        ),
+    }
+    let max_wait = Duration::from_secs(5);
+    let start = std::time::Instant::now();
+    loop {
+        if !is_daemon_running() {
+            eprintln!(
+                "[hope-desktop] :{} cleared after {} ms",
+                DEFAULT_DASHBOARD_PORT,
+                start.elapsed().as_millis(),
+            );
+            return Ok(());
+        }
+        if start.elapsed() > max_wait {
+            return Err(format!(
+                ":{} still bound after {} s",
+                DEFAULT_DASHBOARD_PORT,
+                max_wait.as_secs(),
+            ));
+        }
+        std::thread::sleep(Duration::from_millis(150));
+    }
+}
+
 /// Send SIGTERM, wait up to 3 s for graceful shutdown, then SIGKILL as
 /// last resort. The graceful path lets the daemon close its tmux
 /// session, brain panes, and SQLite connections cleanly.
@@ -516,24 +562,43 @@ pub fn run() {
             show_main_window(app);
         }))
         .setup(move |app| {
-            // Spawn the Python daemon as a child process if nothing's
-            // already on the bridge port. Hope.app now owns the daemon's
-            // lifecycle: open app → daemon up, quit app → daemon down.
-            // Closing the window only hides the UI; daemon keeps running.
-            let daemon_child = if is_daemon_running() {
-                eprintln!("[hope-desktop] daemon already on :{}, not spawning",
-                          DEFAULT_DASHBOARD_PORT);
-                None
-            } else {
-                match spawn_daemon() {
-                    Ok(c) => {
-                        eprintln!("[hope-desktop] spawned daemon pid={}", c.id());
-                        Some(c)
-                    }
-                    Err(e) => {
-                        eprintln!("[hope-desktop] failed to spawn daemon: {}", e);
-                        None
-                    }
+            // Hope.app is the sole owner of the daemon lifecycle:
+            // open app → daemon up, quit app → daemon down. Closing
+            // the window only hides the UI; the daemon stays running
+            // until the app process exits.
+            //
+            // If a daemon is already on the bridge port we used to
+            // leave it alone and run with DaemonHandle=None — but
+            // that produced an orphaned daemon Hope.app couldn't
+            // kill on Cmd-Q, which is the source of the "I quit
+            // Hope but it's still listening" reports. Now we shut
+            // any existing daemon down first, then spawn a fresh
+            // child we own end-to-end. The launchd plist that used
+            // to auto-respawn the daemon has been moved aside (see
+            // ~/Library/LaunchAgents/com.hope.daemon.plist.disabled-
+            // by-app-ownership) so we can't race it any more.
+            if is_daemon_running() {
+                eprintln!(
+                    "[hope-desktop] daemon already on :{}, taking ownership \
+                     (stop + respawn so Cmd-Q kills it cleanly)",
+                    DEFAULT_DASHBOARD_PORT,
+                );
+                if let Err(e) = stop_existing_daemon() {
+                    eprintln!(
+                        "[hope-desktop] could not stop existing daemon: {} \
+                         — continuing without owned child",
+                        e,
+                    );
+                }
+            }
+            let daemon_child = match spawn_daemon() {
+                Ok(c) => {
+                    eprintln!("[hope-desktop] spawned daemon pid={}", c.id());
+                    Some(c)
+                }
+                Err(e) => {
+                    eprintln!("[hope-desktop] failed to spawn daemon: {}", e);
+                    None
                 }
             };
             app.manage(DaemonHandle(Mutex::new(daemon_child)));
