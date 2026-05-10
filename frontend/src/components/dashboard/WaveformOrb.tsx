@@ -27,6 +27,16 @@ interface Props {
 const BAR_COUNT = 96;
 const FFT_SIZE = 256; // 128 frequency bins, plenty for visual
 
+// Per-state colour palette. Shared between the canvas draw loop (orb
+// glow) and the label below the orb so the colour the user sees on
+// "THINKING" matches the orb's purple, "SPEAKING" matches green, etc.
+const PALETTE = {
+  sleeping: { hue: 220, sat: 12, ring: 40 },
+  idle: { hue: 192, sat: 70, ring: 55 },
+  speaking: { hue: 145, sat: 70, ring: 60 },
+  thinking: { hue: 268, sat: 72, ring: 60 },
+} as const;
+
 export function WaveformOrb({ brainState, listeningPaused, size = 320 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -96,17 +106,10 @@ export function WaveformOrb({ brainState, listeningPaused, size = 320 }: Props) 
     const freqBuf = new Uint8Array(FFT_SIZE / 2);
     let t0 = performance.now();
 
-    const palette = {
-      sleeping: { hue: 220, sat: 12, ring: 40 },
-      idle: { hue: 192, sat: 70, ring: 55 },
-      speaking: { hue: 145, sat: 70, ring: 60 },
-      thinking: { hue: 268, sat: 72, ring: 60 },
-    } as const;
-
     const draw = (now: number) => {
       const elapsed = (now - t0) / 1000;
       const { brainState: bs, listeningPaused: paused } = stateRef.current;
-      const tone = palette[bs] ?? palette.idle;
+      const tone = PALETTE[bs] ?? PALETTE.idle;
 
       ctx.clearRect(0, 0, size, size);
 
@@ -228,10 +231,24 @@ export function WaveformOrb({ brainState, listeningPaused, size = 320 }: Props) 
     };
   }, [size]);
 
+  // Human-readable state text shown beneath the orb. Idle stays
+  // intentionally bare so a quiet workspace is, well, quiet — but every
+  // active state gets a clear, sentence-cased label so the user can tell
+  // at a glance what Hope is doing during the silent window between her
+  // ack and her reply.
+  const stateLabel: Record<BrainState, string> = {
+    sleeping: 'Sleeping',
+    idle: '',
+    thinking: 'Thinking…',
+    speaking: 'Speaking',
+  };
+  const labelText = listeningPaused ? 'Muted' : stateLabel[brainState] ?? '';
+  const labelTone = PALETTE[brainState] ?? PALETTE.idle;
+
   return (
     <div
-      className="relative flex items-center justify-center"
-      style={{ width: size, height: size }}
+      className="relative flex flex-col items-center justify-center"
+      style={{ width: size, height: size + 36 }}
       aria-label={`Hope ${brainState}`}
     >
       <canvas
@@ -242,15 +259,18 @@ export function WaveformOrb({ brainState, listeningPaused, size = 320 }: Props) 
           filter: 'blur(0.3px)',
         }}
       />
-      <div
-        className="absolute pointer-events-none text-xs uppercase tracking-[0.3em]"
-        style={{
-          color: 'var(--color-text-tertiary)',
-          opacity: brainState === 'sleeping' ? 0.4 : 0.75,
-        }}
-      >
-        {brainState}
-      </div>
+      {labelText && (
+        <div
+          className="mt-2 text-sm font-medium tracking-[0.18em] uppercase"
+          style={{
+            color: `hsl(${labelTone.hue} ${labelTone.sat}% ${labelTone.ring}%)`,
+            textShadow: '0 0 12px rgba(0,0,0,0.45)',
+            opacity: 0.95,
+          }}
+        >
+          {labelText}
+        </div>
+      )}
     </div>
   );
 }
