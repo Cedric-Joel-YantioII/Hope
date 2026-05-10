@@ -84,22 +84,31 @@ class VADConfig:
     """Tunables for the silero-VAD gate."""
 
     threshold: float = 0.5  # Speech probability cutoff (0..1)
-    # 500 ms of trailing silence before a segment is finalized. The
-    # user prefers this longer wait — it leaves room to add a clause
-    # mid-thought without the segmenter chopping the utterance. End-
-    # of-speech detection latency is the price; well worth it.
-    min_silence_ms: int = 500
+    # 900 ms of trailing silence before a segment is finalized. Earlier
+    # iterations tried 250 ms (snappy directives) and 500 ms (some
+    # thinking room) but the user kept hitting the cap mid-thought:
+    # finalising on a natural in-sentence pause and shipping half a
+    # request to the brain. 900 ms is the floor that consistently
+    # survives a comfortable mid-sentence breath without feeling
+    # sluggish for short directives — those end with a deliberate stop
+    # and the human doesn't perceive the extra 400 ms of silence as
+    # delay because the ack still fires quickly afterwards. The daemon
+    # also runs a 500 ms debounce-and-merge on top, so longer thinking
+    # pauses (1–1.5 s) still arrive as a single concatenated turn.
+    min_silence_ms: int = 900
     pre_roll_ms: int = 200  # Audio retained BEFORE detected speech onset
     post_roll_ms: int = 500  # Audio retained AFTER speech offset
     min_speech_ms: int = 250  # Drop segments shorter than this (noise)
-    # Hard cap on segment length. Without this, continuous background
-    # audio (TV, podcast playing through the speakers, a long
-    # monologue) keeps appending to the same segment for minutes —
-    # whisper then chokes on the giant chunk and the user sees a wall
-    # of text arrive seconds late. 6 s is enough room for a normal
-    # spoken sentence and short enough that the user-perceived
-    # latency stays under a second on M-series Macs.
-    max_speech_ms: int = 6000
+    # Hard cap on segment length. The original 6 s cap was a defence
+    # against continuous TV / podcast audio building up an enormous
+    # segment, but it kept clipping legitimate 10+ word user requests
+    # mid-sentence (the daemon log shows multiple 6.0/6.1 s force-
+    # finalisations on a single thought). The wake-prefix gate and
+    # conversation window already keep ambient audio out of the brain
+    # loop, so we lift this to 20 s — long enough for any natural
+    # spoken request, still bounded so a stuck mic doesn't grow
+    # unbounded.
+    max_speech_ms: int = 20000
 
 
 # ---------------------------------------------------------------------------

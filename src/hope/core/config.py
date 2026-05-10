@@ -1260,7 +1260,10 @@ class SpeechConfig:
     always_on: bool = False  # True → mic stays open, VAD gates decoding
     model_name: str = "distil-whisper/distil-large-v3.5"
     vad_threshold: float = 0.5  # silero-vad speech probability cutoff
-    min_silence_ms: int = 500  # trailing silence before finalizing a segment
+    # Trailing silence before finalizing a segment. 900 ms is enough to
+    # ride out a natural mid-sentence breath without chopping the user
+    # off — see VADConfig in hope.capture.mic for the full rationale.
+    min_silence_ms: int = 900
     input_device: Optional[str] = None  # None → system default mic
 
 

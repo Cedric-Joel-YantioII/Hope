@@ -14,6 +14,7 @@ import logging
 import platform
 import shutil
 import subprocess
+from typing import Callable, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +61,12 @@ def say(text: str) -> None:
         logger.debug("say() Popen failed: %s", exc)
 
 
-def say_sync(text: str, timeout: float = 120.0) -> None:
+def say_sync(
+    text: str,
+    timeout: float = 120.0,
+    *,
+    on_audio_start: "Optional[Callable[[], None]]" = None,
+) -> None:
     """Speak *text* and BLOCK until playback exits.
 
     Two-tier backend:
@@ -85,7 +91,7 @@ def say_sync(text: str, timeout: float = 120.0) -> None:
     # through to `say` below.
     try:
         from hope.audio.kokoro_tts import speak_blocking_neural
-        if speak_blocking_neural(text, timeout=timeout):
+        if speak_blocking_neural(text, timeout=timeout, on_audio_start=on_audio_start):
             return
     except Exception:  # noqa: BLE001 — TTS must never tear down the daemon
         logger.debug("say_sync: neural backend errored, falling back to say",
@@ -96,6 +102,16 @@ def say_sync(text: str, timeout: float = 120.0) -> None:
         logger.debug("say_sync() skipped — 'say' binary not on PATH: %r", text)
         return
 
+    # On the `say`-binary fallback we don't have a true audio-start
+    # callback (the binary doesn't emit a "playing now" signal). Firing
+    # right before subprocess.run is the closest we can get; the actual
+    # audio onset is ~50–100 ms later, which is well below human
+    # perception threshold for orb-state alignment.
+    if on_audio_start is not None:
+        try:
+            on_audio_start()
+        except Exception:
+            logger.debug("say_sync: on_audio_start callback raised", exc_info=True)
     try:
         subprocess.run(  # noqa: S603 — fixed binary path, text is a literal
             [binary, "-v", _DEFAULT_VOICE, "-r", _DEFAULT_RATE, text],

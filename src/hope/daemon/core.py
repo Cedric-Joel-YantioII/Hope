@@ -224,11 +224,17 @@ class DaemonState:
     # Coarse brain phase derived from internal flags. Mirrors the
     # frontend store's BrainState union so a state_snapshot event can
     # hydrate the dashboard on connect.
-    #   "sleeping" → no hope-main pane spawned yet
-    #   "speaking" → TTS in flight
-    #   "thinking" → brain dispatched, awaiting reply
-    #   "idle"     → pane up, nothing in flight
-    brain_state: str = "sleeping"
+    #   "sleeping" → mic explicitly paused (user muted). Orb grey.
+    #   "speaking" → TTS in flight. Orb pulsing speak colour.
+    #   "thinking" → brain dispatched, awaiting reply. Orb pulsing think colour.
+    #   "idle"     → mic hot, wake monitor active, no turn in flight. Orb blue.
+    #
+    # Note: "no pane spawned yet" is *idle*, not sleeping. With lazy-spawn
+    # (commit 3cce894) the brain pane is only created on the first wake
+    # phrase, so a fresh daemon legitimately has no pane *and* is fully
+    # listening — that's idle. "Sleeping" is reserved for the explicit
+    # listening_paused state.
+    brain_state: str = "idle"
     extras: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -339,6 +345,20 @@ class HopeDaemon:
         # FIFO in the turn-done finally block. Capped at 2.
         self._pending_transcripts: list[str] = []
         self._pending_lock = threading.Lock()
+        # Transcript debounce-and-merge — VAD finalises on a 900 ms
+        # silence, but a thoughtful user often pauses 1.0–1.5 s
+        # mid-request. Without this layer, the daemon would dispatch the
+        # first half ("Hope, can you") before the second arrives ("find
+        # me the latest news") and the brain replies confused. The
+        # debouncer holds dispatch for ``_DEBOUNCE_SEC`` after each
+        # transcript; if another arrives within that window, both are
+        # concatenated and the timer resets. The single submit at the
+        # end carries the user's full thought as one turn.
+        self._debounce_lock = threading.Lock()
+        self._debounce_buffer: list[str] = []
+        self._debounce_timer: Optional[threading.Timer] = None
+        self._debounce_main_id: Optional[str] = None
+        self._DEBOUNCE_SEC = 0.5
         # Voice-turn trace store + opt-in learning loop. Built lazily in
         # ``start()`` so tests can construct the daemon without writing to
         # ``~/.hope``.
@@ -387,26 +407,30 @@ class HopeDaemon:
                 # Trim expired entries.
                 now = time.time()
                 self._echo_log = [(t, exp) for t, exp in self._echo_log if exp > now]
-            self._speaking.set()
-            # Tell the dashboard orb (and any other subscribers) that
-            # Hope is now actually speaking. Best-effort: a missing or
-            # broken bus must never block TTS.
+
+            def _on_audio_start() -> None:
+                """Fired by the TTS backend when audio actually starts
+                emitting (right before afplay / `say` subprocess runs).
+                Keeps the orb in `thinking` through the synth window so
+                the visual state matches what the user can hear."""
+                self._speaking.set()
+                try:
+                    self._bus.publish(
+                        EventType.SPEAKING_STARTED,
+                        {
+                            "text": text,
+                            "char_count": len(text),
+                            # ~5 chars/sec at HOPE_VOICE_RATE=200 wpm; the
+                            # frontend uses this to scale the synthesised
+                            # envelope's duration.
+                            "estimated_duration_sec": max(0.5, len(text) / 14.0),
+                        },
+                    )
+                except Exception:
+                    logger.debug("speaking_started publish failed", exc_info=True)
+
             try:
-                self._bus.publish(
-                    EventType.SPEAKING_STARTED,
-                    {
-                        "text": text,
-                        "char_count": len(text),
-                        # ~5 chars/sec at HOPE_VOICE_RATE=200 wpm; the
-                        # frontend uses this to scale the synthesised
-                        # envelope's duration.
-                        "estimated_duration_sec": max(0.5, len(text) / 14.0),
-                    },
-                )
-            except Exception:
-                logger.debug("speaking_started publish failed", exc_info=True)
-            try:
-                say_sync(text)
+                say_sync(text, on_audio_start=_on_audio_start)
             except Exception:
                 logger.exception("say_sync failed")
             finally:
@@ -825,6 +849,14 @@ class HopeDaemon:
             logger.info(
                 "resume: dropped %d stale queued transcript(s)", dropped,
             )
+        # Same drill for the debounce buffer — anything sitting there
+        # was captured before the pause and is moot now.
+        with self._debounce_lock:
+            if self._debounce_timer is not None:
+                self._debounce_timer.cancel()
+                self._debounce_timer = None
+            self._debounce_buffer.clear()
+            self._debounce_main_id = None
         # Cancel any in-flight brain turn so ``_brain_busy`` clears
         # quickly. Done off-thread so it doesn't block the control
         # socket on tmux send-keys.
@@ -964,6 +996,15 @@ class HopeDaemon:
             except Exception:
                 logger.exception("speech_backend.stop() failed")
             self._speech_backend = None
+
+        # Cancel a pending debounce timer so we don't fire one last
+        # transcript dispatch into a dying executor.
+        with self._debounce_lock:
+            if self._debounce_timer is not None:
+                self._debounce_timer.cancel()
+                self._debounce_timer = None
+            self._debounce_buffer.clear()
+            self._debounce_main_id = None
 
         # Flush the brain worker. cancel_futures=True drops queued
         # transcripts — the daemon is going away, they're moot.
@@ -1148,22 +1189,72 @@ class HopeDaemon:
                         "greeting (was muted)",
                     )
                     return
-                # Truly already awake and not paused — silent. The
-                # "I'm already awake" chatter was annoying and caused
-                # more echo feedback when mic re-captured it.
-                logger.info("wake ignored — already awake")
+                # Already awake. We need to distinguish two cases by
+                # what the user actually said, not by timing windows:
+                #
+                #  (a) "Hope, what time is it" — the PhraseMatcher's
+                #      address pattern fires WAKE_TRIGGER, but the
+                #      brain is also being handed the request via
+                #      _on_speech_transcript. Speaking "I'm here." on
+                #      top would be redundant chatter on every turn.
+                #
+                #  (b) "Wake up, Hope" / "Hey Hope" / just "Hope" with
+                #      nothing following — the user is probing whether
+                #      she's listening. Without an audible reply they
+                #      conclude she's broken (this is the actual user
+                #      complaint). Speak a brief "I'm here, sir."
+                #
+                # Test: strip the wake prefix off the trigger payload's
+                # text. If nothing remains, it was a bare wake — speak.
+                # Otherwise the brain pipeline is handling it — stay
+                # silent.
+                trigger_text = str(payload.get("text") or "")
+                cleaned, had_prefix = _strip_wake_prefix(trigger_text)
+                is_bare_wake = had_prefix and not cleaned.strip()
+                if not is_bare_wake:
+                    logger.info(
+                        "wake ignored — already awake (mid-turn, "
+                        "brain pipeline handling content)"
+                    )
+                    return
+                self._last_brain_turn_at = time.monotonic()
+                self._speak_blocking("I'm here, sir.")
+                logger.info(
+                    "wake while already-awake — spoke 'I'm here' "
+                    "(bare wake, source=%s, text=%r)",
+                    source,
+                    trigger_text[:40],
+                )
                 return
+            # Speak an INSTANT acknowledgement BEFORE orchestrator.start() —
+            # the Claude Code CLI cold-load blocks 6–12 s, and without
+            # this beat the user yells "Hope!", hears nothing for ten
+            # seconds, and reasonably concludes she's broken. The full
+            # "Hi sir, I am online" still fires once the pane is up; the
+            # short wake-ack is just so the user knows their voice was
+            # heard. Fire it on a worker thread so it overlaps the slow
+            # orchestrator.start() — by the time the greeting fires,
+            # this short phrase is done and ``_speak_lock`` is free.
+            wake_ack = threading.Thread(
+                target=self._speak_blocking,
+                args=("Yes sir, just a moment.",),
+                name="hope-wake-ack",
+                daemon=True,
+            )
+            wake_ack.start()
+            # Open the conversation window now — same rationale as below
+            # but shifted up so a quick follow-up doesn't fall outside
+            # the window during the long pane-spawn.
+            self._last_brain_turn_at = time.monotonic()
             try:
                 orch.start()
             except Exception:
                 logger.exception("orchestrator.start() on wake failed")
                 self._speak_blocking("Hope failed to wake up")
                 return
-            # Open the conversation window now — the user's next utterance
-            # shouldn't need a wake prefix. Critical when whisper mishears
-            # "Hope" as "hook"/"hoe" — fuzzy PhraseMatcher fires the wake
-            # but the strict regex would otherwise reject the follow-up.
-            self._last_brain_turn_at = time.monotonic()
+            # Wait for the wake-ack to finish so the greeting doesn't
+            # serialise behind it via _speak_lock and arrive seconds late.
+            wake_ack.join(timeout=10.0)
             self._speak_blocking("Hi sir, I am online. What can I do for you?")
             logger.info(
                 "Hope is awake — hope-main pane=%s",
@@ -1531,10 +1622,13 @@ class HopeDaemon:
                 except Exception:
                     pass
                 return
-            # new_turn — queue it. Hard cap at 2 pending so a monologue
-            # doesn't build a huge backlog.
+            # new_turn — queue it. The drain step merges all queued
+            # segments into a single follow-up turn so VAD chopping
+            # mid-brain doesn't multiply turns. Cap raised to 5 (was 2)
+            # because the cap now bounds *length of one merged thought*
+            # rather than *number of separate turns waiting*.
             with self._pending_lock:
-                if len(self._pending_transcripts) >= 2:
+                if len(self._pending_transcripts) >= 5:
                     logger.info("speech bridge: queue full, dropping: %r", text[:60])
                     _sys.stderr.write(f"[QUEUE-FULL] {text!r}\n")
                     _sys.stderr.flush()
@@ -1577,6 +1671,16 @@ class HopeDaemon:
                 _sys.stderr.write(f"[WAKE-BARE] {text!r}\n")
                 _sys.stderr.flush()
                 return
+            # Open the conversation window NOW — not just after Hope
+            # replies. This is the key fix for VAD-chopped requests:
+            # when the user says "Hope, can you find me <pause> the
+            # latest news", the second chunk has no wake prefix and
+            # arrives BEFORE Hope has spoken anything, so the old gate
+            # would drop it as [NO-WAKE-PREFIX]. Opening the window on
+            # an accepted-prefix turn means the immediate follow-up
+            # falls into the same window and gets merged by the
+            # debouncer instead.
+            self._last_brain_turn_at = now_mono
             text = cleaned  # strip "Hope, " before forwarding
         elif not in_window:
             logger.info(
@@ -1594,15 +1698,10 @@ class HopeDaemon:
             )
             return
 
-        executor = self._ensure_brain_executor()
-        if executor is None:  # pragma: no cover — shutdown race
-            return
-        try:
-            executor.submit(self._process_transcript, text, main_id)
-        except RuntimeError:
-            # Executor was shut down mid-dispatch — drop the transcript
-            # rather than crashing the event bus.
-            logger.debug("speech bridge: executor shut down — dropping transcript")
+        # Debounce-and-merge: hold dispatch for a beat to absorb the
+        # follow-up clause if the user is mid-thought. Implementation in
+        # ``_enqueue_debounced``.
+        self._enqueue_debounced(text, main_id)
 
     def _ensure_brain_executor(self) -> Optional[ThreadPoolExecutor]:
         """Build the single-slot brain worker on demand."""
@@ -1611,6 +1710,65 @@ class HopeDaemon:
                 max_workers=1, thread_name_prefix="hope-brain"
             )
         return self._brain_executor
+
+    def _enqueue_debounced(self, text: str, main_id: str) -> None:
+        """Add *text* to the merge buffer, (re)arm the flush timer.
+
+        If a fresh transcript arrives before the timer fires, the buffer
+        keeps growing and the timer resets — the user gets *one* brain
+        turn for what they spoke, even if the VAD chopped it into two
+        or three segments.
+        """
+        import sys as _sys
+
+        with self._debounce_lock:
+            if self._debounce_timer is not None:
+                self._debounce_timer.cancel()
+            self._debounce_buffer.append(text)
+            self._debounce_main_id = main_id
+            buffered = list(self._debounce_buffer)
+            self._debounce_timer = threading.Timer(
+                self._DEBOUNCE_SEC, self._flush_debounced
+            )
+            self._debounce_timer.daemon = True
+            self._debounce_timer.start()
+        if len(buffered) > 1:
+            _sys.stderr.write(
+                f"[DEBOUNCE-MERGE] {len(buffered)} segments queued: {buffered!r}\n"
+            )
+            _sys.stderr.flush()
+
+    def _flush_debounced(self) -> None:
+        """Submit the merged buffer to the brain executor."""
+        import sys as _sys
+
+        with self._debounce_lock:
+            if not self._debounce_buffer:
+                return
+            merged = " ".join(s.strip() for s in self._debounce_buffer if s.strip())
+            main_id = self._debounce_main_id
+            self._debounce_buffer = []
+            self._debounce_timer = None
+            self._debounce_main_id = None
+        if not merged or main_id is None:
+            return
+        # Re-check the pane is still alive — it may have changed during
+        # the debounce window (sleep / wake cycle, daemon shutdown).
+        orch = self._orchestrator
+        if orch is None or orch.registry.get(main_id) is None:
+            logger.debug("debounce flush: pane vanished, dropping %r", merged[:60])
+            return
+        executor = self._ensure_brain_executor()
+        if executor is None:
+            return
+        _sys.stderr.write(f"[DEBOUNCE-FLUSH] {merged!r}\n")
+        _sys.stderr.flush()
+        try:
+            executor.submit(self._process_transcript, merged, main_id)
+        except RuntimeError:
+            logger.debug(
+                "debounce flush: executor shut down — dropping %r", merged[:60]
+            )
 
     def _get_brain_session(self, main_id: str) -> Any:
         """Return a cached :class:`BrainSession` for *main_id*, rebuilding
@@ -1809,37 +1967,29 @@ class HopeDaemon:
             ack_thread = None
             if not skip_ack:
                 def _ack_worker():
-                    # Wait before speaking — if brain is fast, this window
-                    # expires with cancel set and we say nothing.
+                    # Wait before speaking — if brain is fast OR streaming
+                    # fires, this window expires with cancel set and we
+                    # say nothing.
                     if ack_cancel.wait(timeout=_ACK_DELAY_SEC):
                         return
-                    # Try the small-model ack generator. Tight timeout —
-                    # we want the ack in flight well before the brain
-                    # typical 2–5 s reply.
-                    phrase = None
+                    # Canned phrases only. The gemma3:4b path was tipping
+                    # the critical-path budget by 1–3 s on cold inference
+                    # and adding nothing the user could distinguish from a
+                    # rotating 4–7 word bank. Personalised acks now live
+                    # in the offline learning loop, not the hot loop.
                     try:
-                        from hope.learning.acks_gemma import gen_ack
-                        # Gemma3:4b warm-eval is ~3s on M2; brain
-                        # typically takes 5+s. With keep_alive=-1
-                        # in acks_gemma, the model stays loaded so
-                        # this is the eval-only budget, not load+eval.
-                        phrase = gen_ack(text, timeout=3.0)
+                        from hope.learning.acks_bank import pick_ack
+                        phrase = pick_ack(text, recent=self._recent_acks[-3:])
                     except Exception:
-                        logger.debug("acks_gemma failed", exc_info=True)
-                    if ack_cancel.is_set():
-                        return
-                    if not phrase:
-                        try:
-                            from hope.learning.acks_bank import pick_ack
-                            phrase = pick_ack(text, recent=self._recent_acks[-3:])
-                        except Exception:
-                            phrase = _random.choice(self._ack_phrases())
+                        phrase = _random.choice(self._ack_phrases())
                     if ack_cancel.is_set():
                         return
                     self._recent_acks.append(phrase)
                     if len(self._recent_acks) > 8:
                         self._recent_acks = self._recent_acks[-8:]
                     turn.ack_spoken = phrase
+                    _sys.stderr.write(f"[ACK] {phrase!r}\n")
+                    _sys.stderr.flush()
                     self._speak_blocking(phrase)
                 ack_thread = threading.Thread(
                     target=_ack_worker, name="hope-ack", daemon=True,
@@ -1857,9 +2007,15 @@ class HopeDaemon:
             if ack_thread is not None:
                 ack_thread.join(timeout=10.0)
             if not reply:
-                logger.info("brain worker: empty reply — not speaking")
-                _sys.stderr.write("[BRAIN ←] (empty reply)\n")
+                # Hope must NEVER go silent on the user. If the brain
+                # returned nothing — timeout, parse failure, dead pane —
+                # close the turn out loud so the user doesn't sit there
+                # wondering whether she heard them.
+                fallback = "I lost the thread there, sir — try once more."
+                _sys.stderr.write("[BRAIN ←] (empty reply, speaking fallback)\n")
                 _sys.stderr.flush()
+                turn.tts_spoken = fallback
+                self._speak_blocking(fallback)
                 return
             logger.info("brain worker: reply=%r", reply[:120])
             _sys.stderr.write(f"[BRAIN ←] {reply!r}\n")
@@ -2217,26 +2373,42 @@ class HopeDaemon:
     def _drain_pending_turns(self, main_id: str) -> None:
         """After a turn ends, process any queued mid-brain transcripts.
 
-        Each queued transcript becomes its own full turn (ack + brain
-        send + reply TTS). We're already running INSIDE the single-slot
-        brain executor (this is called from ``_process_transcript``'s
-        ``finally`` block), so we invoke ``_process_transcript``
-        directly instead of submitting back into the executor — that
-        would deadlock because the only worker slot is occupied by us.
+        Multiple segments queued *during the same brain turn* almost
+        always belong to one continuous user thought that VAD chopped —
+        the user kept talking after Hope started thinking. We merge
+        them into a single follow-up turn rather than replying to each
+        fragment in isolation. The single-slot executor still serializes
+        them with the ongoing turn either way.
+
+        We're called from ``_process_transcript``'s ``finally`` block —
+        already inside the single brain worker slot — so we invoke
+        ``_process_transcript`` directly rather than submitting back in
+        (which would deadlock).
         """
         while True:
             with self._pending_lock:
                 if not self._pending_transcripts:
                     return
-                nxt = self._pending_transcripts.pop(0)
-            logger.info("draining queued transcript: %r", nxt[:80])
+                # Drain everything that accumulated during the prior
+                # turn and merge it into one logical user request.
+                merged_parts = list(self._pending_transcripts)
+                self._pending_transcripts.clear()
+            merged = " ".join(p.strip() for p in merged_parts if p.strip())
+            if not merged:
+                continue
+            if len(merged_parts) > 1:
+                import sys as _sys
+                _sys.stderr.write(
+                    f"[DRAIN-MERGE] {len(merged_parts)} segments → {merged!r}\n"
+                )
+                _sys.stderr.flush()
+            logger.info(
+                "draining %d queued transcript(s) as one turn: %r",
+                len(merged_parts),
+                merged[:80],
+            )
             try:
-                # Direct call — already on the brain worker thread.
-                # New SPEECH_TRANSCRIPT events arriving during this
-                # call will be queued (brain_busy is back to set
-                # because _process_transcript flips it inside) and
-                # picked up by the next iteration of this loop.
-                self._process_transcript(nxt, main_id)
+                self._process_transcript(merged, main_id)
             except Exception:
                 logger.exception("drain: pending turn failed")
 
@@ -2719,15 +2891,19 @@ class HopeDaemon:
     def _compute_brain_state(self) -> str:
         """Derive a coarse brain phase from internal flags. Used by the
         dashboard state_snapshot so the orb shows the right colour on
-        connect/reconnect, not the React store default."""
+        connect/reconnect, not the React store default.
+
+        "sleeping" is reserved for the explicit listening_paused state
+        (mic muted by the user). A daemon with no pane spawned but mic
+        hot is *idle* — the lazy-spawn architecture means no-pane is
+        the normal post-boot state.
+        """
+        if self._listening_paused.is_set():
+            return "sleeping"
         if self._speaking.is_set():
             return "speaking"
         if self._brain_busy.is_set():
             return "thinking"
-        orch = self._orchestrator
-        main_id = getattr(orch, "hope_main_pane_id", None) if orch else None
-        if not main_id:
-            return "sleeping"
         return "idle"
 
     # ── signals ──────────────────────────────────────────────────────

@@ -34,7 +34,7 @@ import subprocess
 import tempfile
 import threading
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -114,6 +114,7 @@ def speak_blocking_neural(
     speed: Optional[float] = None,
     lang: Optional[str] = None,
     timeout: float = 60.0,
+    on_audio_start: "Optional[Callable[[], None]]" = None,
 ) -> bool:
     """Synthesise *text* via Kokoro and play it through ``afplay``.
 
@@ -153,6 +154,15 @@ def speak_blocking_neural(
         ) as fh:
             tmp = fh.name
         sf.write(tmp, samples, sr)
+        # Fire on_audio_start right before afplay runs so the daemon's
+        # orb transition to "speaking" lines up with audible output, not
+        # with the synth window. Best-effort: a broken callback must
+        # never block playback.
+        if on_audio_start is not None:
+            try:
+                on_audio_start()
+            except Exception:
+                logger.debug("kokoro: on_audio_start callback raised", exc_info=True)
         subprocess.run(  # noqa: S603
             ["afplay", tmp],
             stdout=subprocess.DEVNULL,
